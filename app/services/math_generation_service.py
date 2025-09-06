@@ -75,6 +75,57 @@ class MathGenerationService:
         
         return structure
     
+    def get_units(self) -> List[Dict]:
+        """대단원 목록 조회"""
+        curriculum_file_path = os.path.join(os.path.dirname(__file__), "../../data/middle1_math_curriculum.json")
+        
+        try:
+            with open(curriculum_file_path, 'r', encoding='utf-8') as f:
+                curriculum_data = json.load(f)
+        except FileNotFoundError:
+            return []
+        except json.JSONDecodeError:
+            return []
+        
+        units = {}
+        for item in curriculum_data:
+            if item["grade"] == "중1" and item["semester"] == "1학기":
+                unit_name = item["unit_name"]
+                if unit_name not in units:
+                    units[unit_name] = {
+                        "unit_number": item["unit_number"],
+                        "unit_name": unit_name
+                    }
+        
+        return list(units.values())
+    
+    def get_chapters_by_unit(self, unit_name: str) -> List[Dict]:
+        """특정 대단원의 소단원 목록 조회"""
+        curriculum_file_path = os.path.join(os.path.dirname(__file__), "../../data/middle1_math_curriculum.json")
+        
+        try:
+            with open(curriculum_file_path, 'r', encoding='utf-8') as f:
+                curriculum_data = json.load(f)
+        except FileNotFoundError:
+            return []
+        except json.JSONDecodeError:
+            return []
+        
+        chapters = []
+        for item in curriculum_data:
+            if (item["grade"] == "중1" and 
+                item["semester"] == "1학기" and 
+                item["unit_name"] == unit_name):
+                chapters.append({
+                    "unit_name": item["unit_name"],
+                    "chapter_number": item["chapter_number"],
+                    "chapter_name": item["chapter_name"],
+                    "learning_objectives": item["learning_objectives"],
+                    "keywords": item["keywords"]
+                })
+        
+        return chapters
+    
     def generate_problems(self, db: Session, request: MathProblemGenerationRequest, user_id: int) -> MathProblemGenerationResponse:
         """수학 문제 생성"""
         

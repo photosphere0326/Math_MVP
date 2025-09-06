@@ -166,13 +166,16 @@
         
         <form id="problemForm">
             <div class="form-group">
-                <label for="chapter">단원 선택:</label>
-                <select id="chapter" required>
-                    <option value="">단원을 선택하세요</option>
-                    <option value="소인수분해">소인수분해</option>
-                    <option value="최대공약수와 최소공배수">최대공약수와 최소공배수</option>
-                    <option value="정수">정수</option>
-                    <option value="유리수">유리수</option>
+                <label for="unit">대단원 선택:</label>
+                <select id="unit" required>
+                    <option value="">대단원을 선택하세요</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="chapter">소단원 선택:</label>
+                <select id="chapter" required disabled>
+                    <option value="">먼저 대단원을 선택하세요</option>
                 </select>
             </div>
 
@@ -245,6 +248,62 @@
     </div>
 
     <script>
+        // 페이지 로드 시 대단원 목록 가져오기
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadUnits();
+        });
+
+        // 대단원 목록 로드
+        async function loadUnits() {
+            try {
+                const response = await fetch('/api/math-generation/curriculum/units');
+                const data = await response.json();
+                
+                const unitSelect = document.getElementById('unit');
+                unitSelect.innerHTML = '<option value="">대단원을 선택하세요</option>';
+                
+                data.units.forEach(unit => {
+                    const option = document.createElement('option');
+                    option.value = unit.unit_name;
+                    option.textContent = `${unit.unit_number}. ${unit.unit_name}`;
+                    unitSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('대단원 목록 로드 오류:', error);
+            }
+        }
+
+        // 대단원 선택 시 소단원 목록 로드
+        document.getElementById('unit').addEventListener('change', async function(e) {
+            const unitName = e.target.value;
+            const chapterSelect = document.getElementById('chapter');
+            
+            if (!unitName) {
+                chapterSelect.innerHTML = '<option value="">먼저 대단원을 선택하세요</option>';
+                chapterSelect.disabled = true;
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/math-generation/curriculum/chapters?unit_name=${encodeURIComponent(unitName)}`);
+                const data = await response.json();
+                
+                chapterSelect.innerHTML = '<option value="">소단원을 선택하세요</option>';
+                
+                data.chapters.forEach(chapter => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify(chapter);
+                    option.textContent = `${chapter.chapter_number}. ${chapter.chapter_name}`;
+                    chapterSelect.appendChild(option);
+                });
+                
+                chapterSelect.disabled = false;
+            } catch (error) {
+                console.error('소단원 목록 로드 오류:', error);
+                chapterSelect.innerHTML = '<option value="">소단원 로드 실패</option>';
+            }
+        });
+
         document.getElementById('problemForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -254,7 +313,8 @@
             const results = document.getElementById('results');
             
             // 폼 데이터 수집
-            const chapter = document.getElementById('chapter').value;
+            const unitName = document.getElementById('unit').value;
+            const chapterData = JSON.parse(document.getElementById('chapter').value);
             const problemCount = document.getElementById('problemCount').value;
             const diffA = parseInt(document.getElementById('diffA').value) || 0;
             const diffB = parseInt(document.getElementById('diffB').value) || 0;
@@ -262,7 +322,7 @@
             const typeMultiple = parseInt(document.getElementById('typeMultiple').value) || 0;
             const typeEssay = parseInt(document.getElementById('typeEssay').value) || 0;
             const typeShort = parseInt(document.getElementById('typeShort').value) || 0;
-            const userText = document.getElementById('userText').value || `${chapter} 문제를 생성해주세요.`;
+            const userText = document.getElementById('userText').value || `${chapterData.chapter_name} 문제를 생성해주세요.`;
             
             // 비율 검증
             if (diffA + diffB + diffC !== 100) {
@@ -288,11 +348,11 @@
                 semester: "1학기",
                 unit_number: "1",
                 chapter: {
-                    unit_name: "자연수의 성질",
-                    chapter_number: "1",
-                    chapter_name: chapter,
-                    learning_objectives: `${chapter}의 뜻을 알고, 관련 문제를 해결할 수 있다.`,
-                    keywords: chapter
+                    unit_name: chapterData.unit_name,
+                    chapter_number: chapterData.chapter_number,
+                    chapter_name: chapterData.chapter_name,
+                    learning_objectives: chapterData.learning_objectives,
+                    keywords: chapterData.keywords
                 },
                 problem_count: problemCount,
                 difficulty_ratio: {
