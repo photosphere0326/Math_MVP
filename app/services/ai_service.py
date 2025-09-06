@@ -19,32 +19,39 @@ class AIService:
         # Google Vision은 API 키 방식으로 초기화
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = ""  # 빈 값으로 설정하여 API 키 사용
 
-    def generate_math_problem(self, curriculum_data: Dict, user_prompt: str, problem_count: int = 1) -> Dict:
+    def generate_math_problem(self, curriculum_data: Dict, user_prompt: str, problem_count: int = 1, difficulty_ratio: Dict = None) -> Dict:
         """Gemini를 이용한 수학 문제 생성"""
         
-        # 사용자 프롬프트에서 난이도 분석
-        difficulty_level = "중"  # 기본값
-        problem_complexity = ""
-        
-        user_prompt_lower = user_prompt.lower()
-        
-        # ABC 단계 처리
-        if any(keyword in user_prompt for keyword in ["C", "C단계", "최고", "최상", "고난도", "어려운", "심화"]):
-            difficulty_level = "C"
-            problem_complexity = "심화 응용 문제로 창의적 사고와 고난도 추론이 필요한 C단계 수준"
-        elif any(keyword in user_prompt for keyword in ["A", "A단계", "기초", "쉬운", "기본"]):
-            difficulty_level = "A"  
-            problem_complexity = "기본 개념의 단순 적용으로 해결 가능한 A단계 기초 수준"
+        # 난이도 비율을 이용한 문제별 난이도 계산
+        if difficulty_ratio:
+            # 비율에 따른 각 난이도별 문제 개수 계산
+            total_problems = problem_count
+            a_count = round(total_problems * difficulty_ratio['A'] / 100)
+            b_count = round(total_problems * difficulty_ratio['B'] / 100)
+            c_count = total_problems - a_count - b_count  # 나머지는 C
+            
+            difficulty_distribution = f"A단계 {a_count}개, B단계 {b_count}개, C단계 {c_count}개"
         else:
-            difficulty_level = "B"
-            problem_complexity = "기본 개념의 확장 적용이 필요한 B단계 중급 수준"
+            # 사용자 프롬프트에서 난이도 분석 (기존 로직)
+            difficulty_level = "중"  # 기본값
+            user_prompt_lower = user_prompt.lower()
+            
+            # ABC 단계 처리
+            if any(keyword in user_prompt for keyword in ["C", "C단계", "최고", "최상", "고난도", "어려운", "심화"]):
+                difficulty_level = "C"
+            elif any(keyword in user_prompt for keyword in ["A", "A단계", "기초", "쉬운", "기본"]):
+                difficulty_level = "A"  
+            else:
+                difficulty_level = "B"
+            
+            difficulty_distribution = f"모든 문제 {difficulty_level}단계"
 
-        # 참고 문제 가져오기
+        # 참고 문제 가져오기 - 모든 난이도를 포함
         reference_problems = self._get_reference_problems(
             curriculum_data.get('chapter_name', ''), 
-            difficulty_level
+            "ALL"  # 모든 난이도의 참고 문제 포함
         )
-        print(f"🔍 디버그: 챕터={curriculum_data.get('chapter_name')}, 난이도={difficulty_level}")
+        print(f"🔍 디버그: 챕터={curriculum_data.get('chapter_name')}")
         print(f"📚 참고 문제: {reference_problems[:200]}...")
 
         # 문제 개수는 매개변수로 전달받음 (기본값 1개)
@@ -61,25 +68,24 @@ class AIService:
 사용자 요청:
 "{user_prompt}"
 
-문제 난이도: {difficulty_level}
-{problem_complexity}
+⭐ 중요한 난이도 분배 요구사항:
+{difficulty_distribution}
 
 {reference_problems}
 
 생성 조건:
 1. 위 교육과정 범위 내에서 정확히 {problem_count}개 문제 생성
-2. 참고 문제의 스타일과 난이도를 반영하여 비슷한 수준의 문제 생성
-3. 요청된 난이도 수준에 정확히 맞는 문제
+2. 참고 문제의 스타일을 반영하되 완전히 새로운 문제 생성 (복사 금지)
+3. ⭐ 각 문제의 난이도를 위 분배 요구사항에 정확히 맞춰 생성 (가장 중요!)
 4. 사용자가 요청한 문제 유형(객관식/주관식)을 정확히 반영
 5. 명확하고 이해하기 쉬운 문제 설명
 6. 정확한 정답과 단계별 해설 포함
 7. 수학 기호나 수식은 일반 텍스트로 표기 (LaTeX 사용하지 말것)
-8. 참고 문제와 유사하되 완전히 새로운 문제 생성 (복사 금지)
-9. 그림이 필요한 문제인 경우 문제에 "그림 참조" 표시
+8. 그림이 필요한 문제인 경우 문제에 "그림 참조" 표시
 
-⚠️ 중요: 반드시 정확히 {problem_count}개 문제를 JSON 배열 형태로 생성하세요! 더 적거나 더 많으면 안됩니다.
-
-각 문제는 서로 다른 내용이어야 하고, 요청된 난이도와 유형 비율을 최대한 맞춰주세요.
+⚠️ 중요: 
+- 반드시 정확히 {problem_count}개 문제를 JSON 배열 형태로 생성하세요!
+- 각 문제의 "difficulty" 필드를 위 난이도 분배에 맞춰 정확히 설정하세요!
 
 응답 형식 (JSON 배열 - {problem_count}개 문제):
 [
@@ -89,7 +95,7 @@ class AIService:
     "correct_answer": "정답",
     "explanation": "단계별 해설 (일반 텍스트로 작성)",
     "problem_type": "multiple_choice" 또는 "short_answer" 또는 "essay",
-    "difficulty": "{difficulty_level}",
+    "difficulty": "A" 또는 "B" 또는 "C" (위 분배에 맞춰),
     "has_diagram": true/false,
     "diagram_type": "concentration" 또는 "train" 또는 "geometry" 또는 "graph" 등,
     "diagram_elements": {{
@@ -280,26 +286,43 @@ class AIService:
                     break
             
             if chapter_problem_types:
-                # 난이도별 유형 분류
-                total_types = len(chapter_problem_types)
-                difficulty_map = {
-                    "A": {"start": 0, "count": total_types // 3 if total_types >= 3 else total_types},  # 처음 1/3
-                    "B": {"start": total_types // 3, "count": total_types // 3 if total_types >= 6 else max(1, total_types - total_types // 3)},  # 중간 1/3  
-                    "C": {"start": 2 * total_types // 3, "count": total_types - 2 * total_types // 3 if total_types >= 3 else max(1, total_types // 2)}  # 마지막 1/3
-                }
-                
-                if difficulty_level in difficulty_map and total_types > 0:
-                    mapping = difficulty_map[difficulty_level]
-                    start_idx = min(mapping["start"], total_types - 1)
-                    end_idx = min(mapping["start"] + mapping["count"], total_types)
-                    selected_types = chapter_problem_types[start_idx:end_idx]
+                if difficulty_level == "ALL":
+                    # 모든 난이도의 참고 문제 포함
+                    selected_types = chapter_problem_types[:12]  # 최대 12개 유형
+                    types_text = "\n- ".join(selected_types)
+                    
+                    return f"""
+**참고 문제 유형 (모든 난이도 - {chapter_name}):**
+
+다음 유형의 문제들을 참고하여 A, B, C 각 단계에 적합한 난이도로 다양하게 문제를 생성하세요:
+
+- {types_text}
+
+A단계: 기본 개념의 단순 적용
+B단계: 기본 개념의 확장 적용
+C단계: 심화 응용 및 창의적 사고 필요
+                    """
                 else:
-                    selected_types = chapter_problem_types[:5]  # 기본값
-                
-                # 참고 문제 유형 텍스트 생성
-                types_text = "\n- ".join(selected_types[:8])  # 최대 8개 유형만
-                
-                return f"""
+                    # 기존 로직 (특정 난이도)
+                    total_types = len(chapter_problem_types)
+                    difficulty_map = {
+                        "A": {"start": 0, "count": total_types // 3 if total_types >= 3 else total_types},  # 처음 1/3
+                        "B": {"start": total_types // 3, "count": total_types // 3 if total_types >= 6 else max(1, total_types - total_types // 3)},  # 중간 1/3  
+                        "C": {"start": 2 * total_types // 3, "count": total_types - 2 * total_types // 3 if total_types >= 3 else max(1, total_types // 2)}  # 마지막 1/3
+                    }
+                    
+                    if difficulty_level in difficulty_map and total_types > 0:
+                        mapping = difficulty_map[difficulty_level]
+                        start_idx = min(mapping["start"], total_types - 1)
+                        end_idx = min(mapping["start"] + mapping["count"], total_types)
+                        selected_types = chapter_problem_types[start_idx:end_idx]
+                    else:
+                        selected_types = chapter_problem_types[:5]  # 기본값
+                    
+                    # 참고 문제 유형 텍스트 생성
+                    types_text = "\n- ".join(selected_types[:8])  # 최대 8개 유형만
+                    
+                    return f"""
 **참고 문제 유형 ({difficulty_level}단계 - {chapter_name}):**
 
 다음 유형의 문제들을 참고하여 비슷한 수준과 스타일의 문제를 생성하세요:
@@ -307,7 +330,7 @@ class AIService:
 - {types_text}
 
 이 유형들 중에서 사용자 요청에 가장 적합한 유형을 선택하여 {difficulty_level}단계 수준에 맞는 문제를 생성해주세요.
-                """
+                    """
             else:
                 return f"""
 **참고 문제 유형 ({difficulty_level}단계):**

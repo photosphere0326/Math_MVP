@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 from ..schemas.math_generation import MathProblemGenerationRequest, MathProblemGenerationResponse
 from ..services.ai_service import AIService
-from ..models.math_generation import MathProblemGeneration, GeneratedProblemSet
+from ..models.math_generation import MathProblemGeneration
 from ..models.problem import Problem
 from ..models.worksheet import Worksheet, WorksheetStatus
 import uuid
@@ -214,13 +214,7 @@ class MathGenerationService:
             db.add(problem)
             db.flush()
             
-            # 생성된 문제 세트에 추가 (기존 GeneratedProblemSet과의 호환성 유지)
-            problem_set = GeneratedProblemSet(
-                generation_id=generation_id,
-                problem_id=problem.id,
-                sequence_order=i + 1
-            )
-            db.add(problem_set)
+            # GeneratedProblemSet 제거됨 - Problem 테이블의 sequence_order로 대체
             
             # 응답용 데이터 생성
             problem_responses.append({
@@ -325,11 +319,12 @@ class MathGenerationService:
         """
         
         try:
-            # AI 서비스 호출
+            # AI 서비스 호출 - 난이도 비율 정보 추가로 전달
             problems = self.ai_service.generate_math_problem(
                 curriculum_data=curriculum_data,
                 user_prompt=enhanced_prompt,
-                problem_count=request.problem_count.value_int
+                problem_count=request.problem_count.value_int,
+                difficulty_ratio=request.difficulty_ratio.model_dump()
             )
             
             return problems if isinstance(problems, list) else [problems]

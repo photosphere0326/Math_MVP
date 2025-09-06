@@ -7,7 +7,9 @@ import enum
 
 class WorksheetStatus(str, enum.Enum):
     DRAFT = "draft"          # 임시저장
+    PROCESSING = "processing"  # 생성 중
     COMPLETED = "completed"  # 완성
+    FAILED = "failed"        # 생성 실패
     PUBLISHED = "published"  # 발행됨
 
 
@@ -42,6 +44,11 @@ class Worksheet(Base):
     
     # 상태 관리
     status = Column(Enum(WorksheetStatus), default=WorksheetStatus.COMPLETED)
+    
+    # 비동기 처리 관련
+    celery_task_id = Column(String, nullable=True, index=True)  # Celery 태스크 ID
+    error_message = Column(Text, nullable=True)  # 오류 메시지
+    completed_at = Column(DateTime(timezone=True), nullable=True)  # 완료 시간
     
     # 메타데이터
     created_by = Column(Integer)

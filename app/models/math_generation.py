@@ -42,16 +42,4 @@ class MathProblemGeneration(Base):
     # problems relationship removed since Problem model no longer exists
 
 
-class GeneratedProblemSet(Base):
-    """생성된 문제 세트"""
-    __tablename__ = "generated_problem_sets"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    generation_id = Column(String, ForeignKey("math_problem_generations.generation_id"), nullable=False)
-    problem_id = Column(Integer)  # Removed foreign key reference
-    sequence_order = Column(Integer, nullable=False)  # 문제 순서
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # 관계  
-    generation = relationship("MathProblemGeneration")
+# GeneratedProblemSet 모델 제거됨 - Problem 테이블의 sequence_order와 worksheet_id로 대체
