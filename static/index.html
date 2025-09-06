@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수학 문제 생성기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #000000;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            border: 1px solid #000000;
+            padding: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .form-group select,
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #000000;
+            background-color: #ffffff;
+            color: #000000;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+
+        .ratio-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .ratio-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .ratio-item label {
+            font-size: 12px;
+            margin-bottom: 3px;
+        }
+
+        .ratio-item input {
+            width: 60px;
+            text-align: center;
+        }
+
+        .button {
+            background-color: #000000;
+            color: #ffffff;
+            padding: 15px 30px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .button:hover {
+            background-color: #333333;
+        }
+
+        .button:disabled {
+            background-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #000000;
+            margin-top: 20px;
+        }
+
+        .results {
+            margin-top: 30px;
+            border: 2px solid #000000;
+            padding: 20px;
+        }
+
+        .result-header {
+            border-bottom: 1px solid #000000;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .problem {
+            border: 1px solid #000000;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .problem-header {
+            font-weight: bold;
+            border-bottom: 1px solid #000000;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        .choices {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .explanation {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #000000;
+            font-size: 14px;
+        }
+
+        .error {
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            color: #000000;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>중학교 1학년 수학 문제 생성기</h1>
+        
+        <form id="problemForm">
+            <div class="form-group">
+                <label for="chapter">단원 선택:</label>
+                <select id="chapter" required>
+                    <option value="">단원을 선택하세요</option>
+                    <option value="소인수분해">소인수분해</option>
+                    <option value="최대공약수와 최소공배수">최대공약수와 최소공배수</option>
+                    <option value="정수">정수</option>
+                    <option value="유리수">유리수</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="problemCount">문제 개수:</label>
+                <select id="problemCount" required>
+                    <option value="10문제">10문제</option>
+                    <option value="20문제">20문제</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>난이도 비율 (%):</label>
+                <div class="ratio-group">
+                    <div class="ratio-item">
+                        <label for="diffA">A단계 (기초)</label>
+                        <input type="number" id="diffA" min="0" max="100" value="30">
+                    </div>
+                    <div class="ratio-item">
+                        <label for="diffB">B단계 (중급)</label>
+                        <input type="number" id="diffB" min="0" max="100" value="50">
+                    </div>
+                    <div class="ratio-item">
+                        <label for="diffC">C단계 (심화)</label>
+                        <input type="number" id="diffC" min="0" max="100" value="20">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>문제 유형 비율 (%):</label>
+                <div class="ratio-group">
+                    <div class="ratio-item">
+                        <label for="typeMultiple">객관식</label>
+                        <input type="number" id="typeMultiple" min="0" max="100" value="60">
+                    </div>
+                    <div class="ratio-item">
+                        <label for="typeEssay">서술형</label>
+                        <input type="number" id="typeEssay" min="0" max="100" value="20">
+                    </div>
+                    <div class="ratio-item">
+                        <label for="typeShort">단답형</label>
+                        <input type="number" id="typeShort" min="0" max="100" value="20">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="userText">추가 요구사항:</label>
+                <textarea id="userText" placeholder="예: 기초적인 문제로 만들어주세요, 실생활 예시를 포함해주세요 등"></textarea>
+            </div>
+
+            <button type="submit" class="button" id="generateBtn">문제 생성하기</button>
+        </form>
+
+        <div id="loading" class="loading hidden">
+            <p>AI가 문제를 생성하고 있습니다...</p>
+            <p>약 30초 정도 소요됩니다.</p>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <div id="results" class="results hidden">
+            <div class="result-header">
+                <h2>생성된 문제</h2>
+                <div id="resultSummary"></div>
+            </div>
+            <div id="problemList"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('problemForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const generateBtn = document.getElementById('generateBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const results = document.getElementById('results');
+            
+            // 폼 데이터 수집
+            const chapter = document.getElementById('chapter').value;
+            const problemCount = document.getElementById('problemCount').value;
+            const diffA = parseInt(document.getElementById('diffA').value) || 0;
+            const diffB = parseInt(document.getElementById('diffB').value) || 0;
+            const diffC = parseInt(document.getElementById('diffC').value) || 0;
+            const typeMultiple = parseInt(document.getElementById('typeMultiple').value) || 0;
+            const typeEssay = parseInt(document.getElementById('typeEssay').value) || 0;
+            const typeShort = parseInt(document.getElementById('typeShort').value) || 0;
+            const userText = document.getElementById('userText').value || `${chapter} 문제를 생성해주세요.`;
+            
+            // 비율 검증
+            if (diffA + diffB + diffC !== 100) {
+                alert('난이도 비율의 합이 100%가 되어야 합니다.');
+                return;
+            }
+            
+            if (typeMultiple + typeEssay + typeShort !== 100) {
+                alert('문제 유형 비율의 합이 100%가 되어야 합니다.');
+                return;
+            }
+            
+            // UI 상태 변경
+            generateBtn.disabled = true;
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+            
+            // API 요청 데이터
+            const requestData = {
+                school_level: "중학교",
+                grade: 1,
+                semester: "1학기",
+                unit_number: "1",
+                chapter: {
+                    unit_name: "자연수의 성질",
+                    chapter_number: "1",
+                    chapter_name: chapter,
+                    learning_objectives: `${chapter}의 뜻을 알고, 관련 문제를 해결할 수 있다.`,
+                    keywords: chapter
+                },
+                problem_count: problemCount,
+                difficulty_ratio: {
+                    A: diffA,
+                    B: diffB,
+                    C: diffC
+                },
+                problem_type_ratio: {
+                    multiple_choice: typeMultiple,
+                    essay: typeEssay,
+                    short_answer: typeShort
+                },
+                user_text: userText
+            };
+            
+            try {
+                const response = await fetch('/api/math-generation/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '문제 생성에 실패했습니다.');
+                }
+                
+                const data = await response.json();
+                displayResults(data);
+                
+            } catch (err) {
+                console.error('Error:', err);
+                error.textContent = '오류: ' + err.message;
+                error.classList.remove('hidden');
+            } finally {
+                generateBtn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        });
+        
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            const resultSummary = document.getElementById('resultSummary');
+            const problemList = document.getElementById('problemList');
+            
+            // 요약 정보
+            resultSummary.innerHTML = `
+                <p><strong>워크시트 ID:</strong> ${data.worksheet_id}</p>
+                <p><strong>생성된 문제 수:</strong> ${data.total_generated}개</p>
+                <p><strong>실제 난이도 분포:</strong> A단계 ${data.actual_difficulty_distribution.A}개, B단계 ${data.actual_difficulty_distribution.B}개, C단계 ${data.actual_difficulty_distribution.C}개</p>
+                <p><strong>실제 유형 분포:</strong> 객관식 ${data.actual_type_distribution.multiple_choice}개, 서술형 ${data.actual_type_distribution.essay}개, 단답형 ${data.actual_type_distribution.short_answer}개</p>
+            `;
+            
+            // 문제 목록
+            problemList.innerHTML = '';
+            data.problems.forEach(problem => {
+                const problemDiv = document.createElement('div');
+                problemDiv.className = 'problem';
+                
+                let choicesHtml = '';
+                if (problem.choices && problem.choices.length > 0) {
+                    choicesHtml = '<div class="choices"><strong>선택지:</strong><br>';
+                    problem.choices.forEach((choice, index) => {
+                        choicesHtml += `${index + 1}. ${choice}<br>`;
+                    });
+                    choicesHtml += '</div>';
+                }
+                
+                problemDiv.innerHTML = `
+                    <div class="problem-header">
+                        문제 ${problem.sequence_order}번 [${problem.difficulty}단계, ${getTypeLabel(problem.problem_type)}]
+                    </div>
+                    <div><strong>문제:</strong> ${problem.question}</div>
+                    ${choicesHtml}
+                    <div><strong>정답:</strong> ${problem.correct_answer}</div>
+                    <div class="explanation"><strong>해설:</strong> ${problem.explanation}</div>
+                `;
+                
+                problemList.appendChild(problemDiv);
+            });
+            
+            results.classList.remove('hidden');
+        }
+        
+        function getTypeLabel(type) {
+            switch(type) {
+                case 'multiple_choice': return '객관식';
+                case 'essay': return '서술형';
+                case 'short_answer': return '단답형';
+                default: return type;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+
+[
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "I",
+    "unit_name": "소인수분해",
+    "chapter_number": "01",
+    "chapter_name": "소인수분해",
+    "learning_objectives": "자연수를 소인수분해할 수 있고, 소인수분해의 뜻을 안다. 거듭제곱의 뜻을 알고 표현할 수 있다.",
+    "keywords": "소수, 합성수, 소인수, 소인수분해, 거듭제곱",
+    "difficulty_levels": "{\"easy\": \"기본적인 소인수분해\", \"medium\": \"큰 수의 소인수분해\", \"hard\": \"소인수분해 응용문제\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "I",
+    "unit_name": "소인수분해",
+    "chapter_number": "02",
+    "chapter_name": "최대공약수와 최소공배수",
+    "learning_objectives": "최대공약수와 최소공배수의 뜻을 알고 구할 수 있다. 최대공약수와 최소공배수를 활용하여 실생활 문제를 해결할 수 있다.",
+    "keywords": "공약수, 최대공약수, 공배수, 최소공배수, 서로소",
+    "difficulty_levels": "{\"easy\": \"두 수의 최대공약수, 최소공배수\", \"medium\": \"세 수의 최대공약수, 최소공배수\", \"hard\": \"최대공약수와 최소공배수 활용 문제\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "II",
+    "unit_name": "정수와 유리수",
+    "chapter_number": "03",
+    "chapter_name": "정수와 유리수",
+    "learning_objectives": "양수와 음수의 뜻을 알고, 정수와 유리수의 개념을 이해한다. 수직선 위에서 정수와 유리수를 나타낼 수 있다.",
+    "keywords": "양수, 음수, 정수, 유리수, 수직선, 절댓값",
+    "difficulty_levels": "{\"easy\": \"양수, 음수 구별하기\", \"medium\": \"유리수의 대소관계\", \"hard\": \"절댓값과 부등호 문제\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "II",
+    "unit_name": "정수와 유리수",
+    "chapter_number": "04",
+    "chapter_name": "유리수의 계산",
+    "learning_objectives": "유리수의 덧셈, 뺄셈, 곱셈, 나눗셈을 할 수 있다. 사칙연산의 혼합계산을 할 수 있다.",
+    "keywords": "유리수의 덧셈, 뺄셈, 곱셈, 나눗셈, 혼합계산, 분배법칙",
+    "difficulty_levels": "{\"easy\": \"같은 부호끼리의 계산\", \"medium\": \"다른 부호끼리의 계산\", \"hard\": \"복잡한 혼합계산\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "III",
+    "unit_name": "방정식",
+    "chapter_number": "05",
+    "chapter_name": "문자의 사용과 식",
+    "learning_objectives": "문자를 사용하여 식을 나타낼 수 있다. 일차식의 덧셈과 뺄셈을 할 수 있다.",
+    "keywords": "문자, 대수, 항, 계수, 차수, 일차식, 동류항",
+    "difficulty_levels": "{\"easy\": \"문자를 사용한 식 만들기\", \"medium\": \"일차식의 덧셈과 뺄셈\", \"hard\": \"복잡한 일차식의 계산\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "III",
+    "unit_name": "방정식",
+    "chapter_number": "06",
+    "chapter_name": "일차방정식의 풀이",
+    "learning_objectives": "일차방정식의 뜻을 알고 풀 수 있다. 방정식의 해를 구하고 검산할 수 있다.",
+    "keywords": "방정식, 해, 일차방정식, 이항, 등식의 성질",
+    "difficulty_levels": "{\"easy\": \"간단한 일차방정식\", \"medium\": \"계수가 소수, 분수인 방정식\", \"hard\": \"복잡한 일차방정식\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "III",
+    "unit_name": "방정식",
+    "chapter_number": "07",
+    "chapter_name": "일차방정식의 활용",
+    "learning_objectives": "일차방정식을 활용하여 실생활 문제를 해결할 수 있다.",
+    "keywords": "활용문제, 나이 문제, 거리 문제, 농도 문제",
+    "difficulty_levels": "{\"easy\": \"기본적인 활용문제\", \"medium\": \"두 단계로 해결하는 문제\", \"hard\": \"복합적인 실생활 문제\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "IV",
+    "unit_name": "그래프와 비례",
+    "chapter_number": "08",
+    "chapter_name": "좌표평면과 그래프",
+    "learning_objectives": "좌표평면에서 점의 좌표를 구하고 점을 나타낼 수 있다. 순서쌍과 그래프의 관계를 이해한다.",
+    "keywords": "좌표평면, 좌표, x축, y축, 원점, 순서쌍, 그래프",
+    "difficulty_levels": "{\"easy\": \"점의 좌표 구하기\", \"medium\": \"좌표평면 위의 도형\", \"hard\": \"좌표를 이용한 도형의 성질\"}"
+  },
+  {
+    "grade": "중1",
+    "subject": "수학",
+    "semester": "1학기",
+    "unit_number": "IV",
+    "unit_name": "그래프와 비례",
+    "chapter_number": "09",
+    "chapter_name": "정비례와 반비례",
+    "learning_objectives": "정비례와 반비례의 뜻을 알고 그래프를 그릴 수 있다. 정비례와 반비례 관계를 활용하여 문제를 해결할 수 있다.",
+    "keywords": "정비례, 반비례, 비례상수, 정비례 그래프, 반비례 그래프",
+    "difficulty_levels": "{\"easy\": \"정비례, 반비례 관계 찾기\", \"medium\": \"비례상수 구하기\", \"hard\": \"정비례, 반비례 활용문제\"}"
+  }
+]
