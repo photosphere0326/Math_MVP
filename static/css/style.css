@@ -488,6 +488,281 @@ header p {
     font-size: 14px;
 }
 
+/* 한국식 시험지 스타일 */
+.worksheet-selection-section {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 2px solid #dee2e6;
+}
+
+.exam-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #000;
+}
+
+.exam-header h2 {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #000;
+}
+
+.exam-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: #000;
+    margin-top: 10px;
+}
+
+.worksheet-selection {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.worksheet-selection label {
+    font-weight: bold;
+    color: #000;
+    white-space: nowrap;
+}
+
+.refresh-btn, .load-exam-btn {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.load-exam-btn {
+    width: 100%;
+    background-color: #007bff;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* 시험지 스타일 */
+.exam-paper {
+    background-color: white;
+    border: 3px solid #000;
+    padding: 30px;
+    margin: 20px 0;
+    font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    min-height: 800px;
+}
+
+.exam-paper-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #000;
+}
+
+.school-info h3 {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-align: center;
+    color: #000;
+}
+
+.exam-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    font-size: 14px;
+    color: #000;
+}
+
+.exam-details span {
+    padding: 2px 0;
+}
+
+.score-box {
+    border: 2px solid #000;
+    padding: 10px;
+    text-align: center;
+    min-width: 80px;
+}
+
+.score-label {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #000;
+}
+
+.score-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #000;
+}
+
+/* 문제 섹션 */
+.question-section {
+    margin-bottom: 30px;
+    border: 1px solid #000;
+    padding: 20px;
+}
+
+.question-section h4 {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #000;
+    background-color: #f8f9fa;
+    padding: 8px 12px;
+    border: 1px solid #000;
+}
+
+/* 객관식 답안 스타일 */
+.mc-answer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.mc-problem {
+    border: 1px solid #ddd;
+    padding: 15px;
+    background-color: #fdfdfd;
+}
+
+.mc-problem h5 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #000;
+}
+
+.mc-problem p {
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: #000;
+    line-height: 1.4;
+}
+
+.mc-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.mc-choice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #000;
+}
+
+.mc-choice input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.mc-choice:hover {
+    background-color: #f0f8ff;
+}
+
+/* 주관식 답안 영역 */
+.subjective-area {
+    min-height: 400px;
+}
+
+.subjective-problem {
+    margin-bottom: 30px;
+    border: 1px solid #ddd;
+    padding: 15px;
+}
+
+.subjective-problem h5 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #000;
+}
+
+.subjective-problem p {
+    font-size: 14px;
+    margin-bottom: 15px;
+    color: #000;
+    line-height: 1.4;
+}
+
+/* 손글씨 입력 캔버스 */
+.drawing-canvas {
+    border: 2px solid #000;
+    background-color: white;
+    cursor: crosshair;
+    display: block;
+    margin: 10px 0;
+}
+
+.canvas-tools {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.canvas-tools button {
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.canvas-tools button:hover {
+    background-color: #e9ecef;
+}
+
+.canvas-tools button.active {
+    background-color: #007bff;
+    color: white;
+}
+
+/* 제출 버튼 */
+.submit-section {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #000;
+}
+
+.submit-exam-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.submit-exam-btn:hover {
+    background-color: #c82333;
+}
+
 /* 반응형 워크시트 스타일 */
 @media (max-width: 768px) {
     .worksheet-header {
@@ -508,4 +783,177 @@ header p {
     .problems-container {
         max-height: 400px;
     }
+    
+    .exam-paper {
+        padding: 15px;
+        margin: 10px 0;
+    }
+    
+    .exam-paper-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .exam-details {
+        grid-template-columns: 1fr;
+    }
+    
+    .mc-answer-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .exam-info {
+        flex-direction: column;
+        gap: 5px;
+        align-items: center;
+    }
+    
+    .worksheet-selection {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+/* 채점 결과 스타일 */
+.exam-result {
+    background-color: white;
+    border: 2px solid #000;
+    padding: 20px;
+    margin: 20px 0;
+    font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif;
+}
+
+.exam-result-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #000;
+}
+
+.exam-result-header h3 {
+    font-size: 20px;
+    font-weight: bold;
+    color: #000;
+    margin-bottom: 10px;
+}
+
+.final-score-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.score-large {
+    font-size: 24px;
+    font-weight: bold;
+    color: #dc3545;
+}
+
+.percentage {
+    font-size: 16px;
+    color: #6c757d;
+}
+
+.score-summary {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.summary-item {
+    text-align: center;
+}
+
+.summary-item .label {
+    display: block;
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.summary-item .value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #000;
+}
+
+.detailed-results h4 {
+    font-size: 16px;
+    font-weight: bold;
+    color: #000;
+    margin-bottom: 15px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #000;
+}
+
+.problem-result {
+    border: 2px solid #dee2e6;
+    margin-bottom: 15px;
+    padding: 15px;
+    background-color: white;
+}
+
+.problem-result.correct {
+    border-color: #28a745;
+    background-color: #f8fff9;
+}
+
+.problem-result.incorrect {
+    border-color: #dc3545;
+    background-color: #fff8f8;
+}
+
+.problem-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.problem-number {
+    font-size: 14px;
+    color: #000;
+}
+
+.status-icon {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.problem-result.correct .status-icon {
+    color: #28a745;
+}
+
+.problem-result.incorrect .status-icon {
+    color: #dc3545;
+}
+
+.points {
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.answer-comparison {
+    margin-bottom: 10px;
+}
+
+.student-answer, .correct-answer {
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #000;
+}
+
+.feedback {
+    background-color: #e9ecef;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #495057;
+    margin-top: 10px;
 }

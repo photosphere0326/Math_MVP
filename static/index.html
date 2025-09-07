@@ -133,27 +133,70 @@
 
         <!-- 채점 탭 -->
         <div id="grading-tab" class="tab-content">
-            <div class="form-section">
-                <h3>채점</h3>
-                <div class="form-group">
-                    <label for="worksheet-id">워크시트 ID:</label>
-                    <input type="number" id="worksheet-id" placeholder="생성된 워크시트 ID 입력">
+            <div class="worksheet-selection-section">
+                <div class="exam-header">
+                    <h2>수학 시험지 채점</h2>
+                    <div class="exam-info">
+                        <span>시험일: <span id="exam-date"></span></span>
+                        <span>학년: <span id="student-grade"></span></span>
+                        <span>이름: ________________</span>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="answers">답안 (JSON 형태):</label>
-                    <textarea id="answers" rows="10" placeholder='{"1": "정답1", "2": "정답2", ...}'></textarea>
+                
+                <div class="worksheet-selection">
+                    <label for="worksheet-select-grading">시험지 선택:</label>
+                    <select id="worksheet-select-grading">
+                        <option value="">시험지를 선택하세요</option>
+                    </select>
+                    <button onclick="refreshWorksheetsForGrading()" class="refresh-btn">새로고침</button>
                 </div>
-                <button onclick="startGrading()" class="btn-primary">채점 시작</button>
+                <button onclick="loadSelectedWorksheetForGrading()" class="load-exam-btn">시험지 불러오기</button>
             </div>
 
+            <!-- 시험지 영역 -->
+            <div id="exam-paper" class="exam-paper" style="display: none;">
+                <div class="exam-paper-header">
+                    <div class="school-info">
+                        <h3 id="exam-title">수학 시험지</h3>
+                        <div class="exam-details">
+                            <span>학교: ○○○학교</span>
+                            <span>학년: <span id="paper-grade"></span></span>
+                            <span>반: ___반</span>
+                            <span>번호: ___번</span>
+                            <span>이름: ________________</span>
+                        </div>
+                    </div>
+                    <div class="score-box">
+                        <div class="score-label">점수</div>
+                        <div class="score-value" id="final-score">___/100</div>
+                    </div>
+                </div>
+
+                <!-- 객관식 문제 영역 -->
+                <div id="multiple-choice-section" class="question-section">
+                    <h4>1. 객관식 (각 문제당 5점)</h4>
+                    <div id="multiple-choice-answers" class="mc-answer-grid"></div>
+                </div>
+
+                <!-- 주관식/서술형 문제 영역 -->
+                <div id="subjective-section" class="question-section">
+                    <h4>2. 주관식/서술형 (각 문제당 10점)</h4>
+                    <div id="subjective-answers" class="subjective-area"></div>
+                </div>
+
+                <div class="submit-section">
+                    <button onclick="submitExamAnswers()" class="submit-exam-btn">답안 제출 및 채점</button>
+                </div>
+            </div>
+
+            <!-- 채점 결과 영역 -->
             <div class="result-section">
-                <h3>채점 결과</h3>
                 <div id="grading-result"></div>
                 <div id="grading-progress" class="progress-container" style="display: none;">
                     <div class="progress-bar">
                         <div class="progress-fill"></div>
                     </div>
-                    <div class="progress-text">대기 중...</div>
+                    <div class="progress-text">채점 중...</div>
                 </div>
             </div>
         </div>

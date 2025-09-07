@@ -35,3 +35,6 @@ build/
 
 # Git LFS
 *.dylib
+
+# History directories
+.history/

@@ -14,6 +14,9 @@ class AIService:
         self.client = genai.Client(
             api_key=os.getenv("GEMINI_API_KEY", "AIzaSyCOX4_nCgcCTTvIf-abckxtC10xTMqzwzM")
         )
+        
+        # Google Vision API 키 설정
+        self.vision_api_key = "AIzaSyCVjBI7eFbggDVLZVU0hRloQk0HAgjp5vE"
         self.model_name = "gemini-2.5-flash"
         
         # Google Vision은 API 키 방식으로 초기화
@@ -79,8 +82,12 @@ class AIService:
 3. ⭐ 각 문제의 난이도를 위 분배 요구사항에 정확히 맞춰 생성 (가장 중요!)
 4. 사용자가 요청한 문제 유형(객관식/주관식)을 정확히 반영
 5. 명확하고 이해하기 쉬운 문제 설명
-6. 정확한 정답과 단계별 해설 포함
-7. 수학 기호나 수식은 일반 텍스트로 표기 (LaTeX 사용하지 말것)
+6. 정확한 정답과 아름다운 단계별 해설 포함
+7. 해설은 반드시 다음 형식으로 작성:
+   - 복잡한 문제: "단계 1: [설명]", "단계 2: [설명]" 형식 사용
+   - 간단한 문제: 명확하고 간결한 설명
+   - 수식은 깔끔하고 읽기 쉬운 형태로 표기
+8. 수학 기호나 수식은 일반 텍스트로 표기 (LaTeX 사용하지 말것)
 8. 그림이 필요한 문제인 경우 문제에 "그림 참조" 표시
 
 ⚠️ 중요: 
@@ -93,7 +100,7 @@ class AIService:
     "question": "문제 내용",
     "choices": ["선택지1", "선택지2", "선택지3", "선택지4"] (객관식인 경우, 주관식은 null),
     "correct_answer": "정답",
-    "explanation": "단계별 해설 (일반 텍스트로 작성)",
+    "explanation": "단계별 해설 (복잡한 문제는 '단계 1:', '단계 2:' 형식으로, 간단한 문제는 명확한 설명으로)",
     "problem_type": "multiple_choice" 또는 "short_answer" 또는 "essay",
     "difficulty": "A" 또는 "B" 또는 "C" (위 분배에 맞춰),
     "has_diagram": true/false,
@@ -106,6 +113,18 @@ class AIService:
   }},
   ... ({problem_count}개 문제까지)
 ]
+
+📚 해설 작성 예시:
+
+**복잡한 문제의 경우:**
+"단계 1: 주어진 조건을 정리합니다. x + 3 = 7에서 x의 값을 구해야 합니다.
+단계 2: 양변에서 3을 빼줍니다. x + 3 - 3 = 7 - 3
+단계 3: 계산하면 x = 4가 됩니다.
+따라서 답은 x = 4입니다."
+
+**간단한 문제의 경우:**
+"등식은 등호(=)를 사용하여 두 식의 값이 같음을 나타내는 식입니다. 
+선택지 중 등호가 포함된 것은 3번 4x = 8입니다."
 
 다시 한번 강조: {problem_count}개 문제를 반드시 생성하세요!
 """
@@ -148,21 +167,72 @@ class AIService:
     def ocr_handwriting(self, image_data: bytes) -> str:
         """Google Vision을 이용한 손글씨 OCR"""
         try:
-            # Google Vision 클라이언트 생성 (API 키 사용)
-            client = vision.ImageAnnotatorClient()
+            print(f"🔍 OCR 디버그: image_data 타입: {type(image_data)}")
+            print(f"🔍 OCR 디버그: image_data 크기: {len(image_data) if image_data else 'None'}")
             
-            image = vision.Image(content=image_data)
-            response = client.text_detection(image=image)
+            if not image_data:
+                print("🔍 OCR 디버그: image_data가 비어있음")
+                return ""
             
-            texts = response.text_annotations
-            if texts:
-                detected_text = texts[0].description
-                return detected_text.strip()
+            # REST API 방식으로 Google Vision API 호출
+            import requests
+            import base64
+            
+            # 이미지 데이터를 base64로 인코딩
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
+            
+            # Google Vision API REST 엔드포인트
+            url = f"https://vision.googleapis.com/v1/images:annotate?key={self.vision_api_key}"
+            
+            payload = {
+                "requests": [
+                    {
+                        "image": {
+                            "content": image_base64
+                        },
+                        "features": [
+                            {
+                                "type": "TEXT_DETECTION",
+                                "maxResults": 1
+                            }
+                        ]
+                    }
+                ]
+            }
+            
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            
+            print(f"🔍 OCR 디버그: Google Vision API 호출 시작")
+            response = requests.post(url, json=payload, headers=headers)
+            print(f"🔍 OCR 디버그: 응답 상태코드: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"🔍 OCR 디버그: 응답 데이터: {str(result)[:200]}...")
+                
+                if 'responses' in result and result['responses']:
+                    response_data = result['responses'][0]
+                    if 'textAnnotations' in response_data and response_data['textAnnotations']:
+                        detected_text = response_data['textAnnotations'][0]['description']
+                        print(f"🔍 OCR 디버그: 인식된 텍스트: {detected_text[:50]}...")
+                        return detected_text.strip()
+                    else:
+                        print("🔍 OCR 디버그: textAnnotations가 비어있음")
+                        return ""
+                else:
+                    print("🔍 OCR 디버그: responses가 비어있음")
+                    return ""
             else:
+                error_msg = response.text
+                print(f"🔍 OCR API 오류: {response.status_code} - {error_msg}")
                 return ""
                 
         except Exception as e:
+            import traceback
             print(f"OCR 처리 오류: {str(e)}")
+            print(f"OCR 오류 상세: {traceback.format_exc()}")
             return ""
 
     def grade_math_answer(self, question: str, correct_answer: str, student_answer: str, explanation: str, problem_type: str = "essay") -> Dict:

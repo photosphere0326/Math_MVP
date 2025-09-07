@@ -5,6 +5,194 @@ const API_BASE = '/api/math-generation';
 let activeTask = null;
 let pollingInterval = null;
 
+// 채점 관련 전역 변수
+let currentWorksheet = null;
+let multipleChoiceAnswers = {};
+
+// 채점용 워크시트 목록 새로고침 (함수 선언을 앞쪽으로 이동)
+async function refreshWorksheetsForGrading() {
+    try {
+        console.log('워크시트 목록 로드 시도...');
+        const response = await fetch(`${API_BASE}/worksheets?limit=50`);
+        console.log('응답 상태:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('받은 데이터:', data);
+        
+        const worksheetSelect = document.getElementById('worksheet-select-grading');
+        if (!worksheetSelect) {
+            console.error('워크시트 선택 요소를 찾을 수 없습니다');
+            return;
+        }
+        
+        worksheetSelect.innerHTML = '<option value="">워크시트를 선택하세요</option>';
+        
+        if (data.worksheets && data.worksheets.length > 0) {
+            console.log('워크시트 개수:', data.worksheets.length);
+            data.worksheets.forEach(worksheet => {
+                const option = document.createElement('option');
+                option.value = worksheet.id;
+                option.textContent = `#${worksheet.id} - ${worksheet.title} (${worksheet.school_level} ${worksheet.grade}학년)`;
+                worksheetSelect.appendChild(option);
+            });
+        } else {
+            console.log('워크시트가 없거나 데이터 구조가 다름');
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "생성된 워크시트가 없습니다";
+            worksheetSelect.appendChild(option);
+        }
+        
+    } catch (error) {
+        console.error('워크시트 목록 로드 오류:', error);
+        alert('워크시트 목록 로드 오류: ' + error.message);
+    }
+}
+
+// 선택한 워크시트 불러오기
+async function loadSelectedWorksheetForGrading() {
+    const worksheetId = document.getElementById('worksheet-select-grading').value;
+    if (!worksheetId) {
+        alert('워크시트를 선택하세요.');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/worksheets/${worksheetId}`);
+        if (!response.ok) {
+            throw new Error('워크시트를 찾을 수 없습니다.');
+        }
+        
+        const data = await response.json();
+        currentWorksheet = data;
+        
+        // 시험지 설정 및 표시
+        setupExamPaper(data);
+        
+        // 시험지로 스크롤은 setupExamPaper 함수에서 처리됩니다.
+        
+    } catch (error) {
+        alert('워크시트 로드 오류: ' + error.message);
+    }
+}
+
+// 시험지 설정 함수
+function setupExamPaper(data) {
+    const examPaper = document.getElementById('exam-paper');
+    const worksheet = data.worksheet;
+    const problems = data.problems;
+    
+    // 시험지 헤더 정보 설정
+    document.getElementById('paper-grade').textContent = `${worksheet.school_level} ${worksheet.grade}학년`;
+    document.getElementById('exam-date').textContent = new Date().toLocaleDateString('ko-KR');
+    
+    // 객관식과 주관식 문제 분리
+    const mcProblems = problems.filter(p => p.problem_type === 'multiple_choice');
+    const subjectiveProblems = problems.filter(p => p.problem_type !== 'multiple_choice');
+    
+    // 객관식 섹션 설정
+    if (mcProblems.length > 0) {
+        setupMultipleChoiceSection(mcProblems);
+        document.getElementById('multiple-choice-section').style.display = 'block';
+    } else {
+        document.getElementById('multiple-choice-section').style.display = 'none';
+    }
+    
+    // 주관식 섹션 설정
+    if (subjectiveProblems.length > 0) {
+        setupSubjectiveSection(subjectiveProblems);
+        document.getElementById('subjective-section').style.display = 'block';
+    } else {
+        document.getElementById('subjective-section').style.display = 'none';
+    }
+    
+    // 시험지 표시
+    examPaper.style.display = 'block';
+    examPaper.scrollIntoView({ behavior: 'smooth' });
+}
+
+// 객관식 섹션 설정
+function setupMultipleChoiceSection(mcProblems) {
+    const mcAnswersDiv = document.getElementById('multiple-choice-answers');
+    let mcHtml = '';
+    
+    mcProblems.forEach(problem => {
+        mcHtml += `
+            <div class="mc-problem">
+                <h5>문제 ${problem.sequence_order}</h5>
+                <p><strong>${problem.question}</strong></p>
+                <div class="mc-choices">
+        `;
+        
+        if (problem.choices) {
+            problem.choices.forEach((choice, index) => {
+                const choiceLabel = String.fromCharCode(65 + index); // A, B, C, D
+                mcHtml += `
+                    <label class="mc-choice">
+                        <input type="radio" name="problem_${problem.id}" value="${choiceLabel}">
+                        ${choiceLabel}. ${choice}
+                    </label>
+                `;
+            });
+        }
+        
+        mcHtml += `
+                </div>
+            </div>
+        `;
+    });
+    
+    mcAnswersDiv.innerHTML = mcHtml;
+}
+
+// 주관식 섹션 설정
+function setupSubjectiveSection(subjectiveProblems) {
+    const subjectiveDiv = document.getElementById('subjective-answers');
+    let subjectiveHtml = '';
+    
+    subjectiveProblems.forEach(problem => {
+        subjectiveHtml += `
+            <div class="subjective-problem">
+                <h5>문제 ${problem.sequence_order}</h5>
+                <p><strong>${problem.question}</strong></p>
+                <div class="canvas-tools">
+                    <button onclick="clearCanvas(${problem.id})" type="button">지우기</button>
+                    <button onclick="changeCanvasColor(${problem.id}, '#000000', this)" type="button" class="active">검정</button>
+                    <button onclick="changeCanvasColor(${problem.id}, '#0066cc', this)" type="button">파랑</button>
+                    <button onclick="changeCanvasColor(${problem.id}, '#cc0000', this)" type="button">빨강</button>
+                    <span>선 굵기: </span>
+                    <input type="range" min="1" max="10" value="2" onchange="changeLineWidth(${problem.id}, this.value)">
+                </div>
+                <canvas 
+                    id="canvas_${problem.id}" 
+                    class="drawing-canvas" 
+                    width="500" 
+                    height="150"
+                    data-problem-id="${problem.id}"
+                    onmousedown="startDrawing(event, ${problem.id})"
+                    onmousemove="draw(event, ${problem.id})"
+                    onmouseup="stopDrawing()"
+                    onmouseleave="stopDrawing()"
+                    ontouchstart="startDrawingTouch(event, ${problem.id})"
+                    ontouchmove="drawTouch(event, ${problem.id})"
+                    ontouchend="stopDrawing()"
+                ></canvas>
+            </div>
+        `;
+    });
+    
+    subjectiveDiv.innerHTML = subjectiveHtml;
+    
+    // 캔버스 초기화
+    subjectiveProblems.forEach(problem => {
+        initializeCanvas(problem.id);
+    });
+}
+
 // 탭 관리
 function showTab(tabName) {
     // 모든 탭 비활성화
@@ -18,6 +206,13 @@ function showTab(tabName) {
     // 선택한 탭 활성화
     document.getElementById(`${tabName}-tab`).classList.add('active');
     document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+    
+    // 채점 탭 선택 시 워크시트 목록 새로고침
+    if (tabName === 'grading') {
+        setTimeout(() => {
+            refreshWorksheetsForGrading();
+        }, 100);
+    }
 }
 
 // 페이지 로드 시 초기화
@@ -29,6 +224,10 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializeApp() {
     await loadUnits();
     setupEventListeners();
+    // 페이지가 완전히 로드된 후 워크시트 목록 로드
+    setTimeout(() => {
+        refreshWorksheetsForGrading();
+    }, 100);
 }
 
 // 대단원 목록 로드
@@ -728,14 +927,277 @@ function useForGrading(worksheetId) {
     // 채점 탭으로 이동
     showTab('grading');
     
-    // 워크시트 ID 입력
-    const worksheetIdInput = document.getElementById('worksheet-id');
-    if (worksheetIdInput) {
-        worksheetIdInput.value = worksheetId;
+    // 워크시트 선택
+    const worksheetSelect = document.getElementById('worksheet-select-grading');
+    if (worksheetSelect) {
+        worksheetSelect.value = worksheetId;
+        loadSelectedWorksheetForGrading();
     }
     
     // 채점 탭으로 스크롤
     document.getElementById('grading-tab').scrollIntoView({ 
         behavior: 'smooth' 
     });
+}
+
+// 시험 답안 제출
+async function submitExamAnswers() {
+    if (!currentWorksheet) {
+        alert('먼저 시험지를 로드하세요.');
+        return;
+    }
+    
+    // 객관식 답안 수집
+    const mcAnswers = {};
+    document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+        const problemId = radio.name.replace('problem_', '');
+        mcAnswers[problemId] = radio.value;
+    });
+    
+    // 캔버스 그림 데이터 수집
+    const canvasData = {};
+    const canvases = document.querySelectorAll('.drawing-canvas');
+    console.log('캔버스 개수:', canvases.length);
+    canvases.forEach(canvas => {
+        const problemId = canvas.dataset.problemId;
+        const dataURL = canvas.toDataURL('image/png');
+        canvasData[problemId] = dataURL;
+        console.log(`캔버스 ${problemId} 데이터 크기:`, dataURL.length, 'bytes');
+    });
+    console.log('수집된 캔버스 데이터:', Object.keys(canvasData));
+    
+    // UI 업데이트
+    const progressContainer = document.getElementById('grading-progress');
+    const resultContainer = document.getElementById('grading-result');
+    progressContainer.style.display = 'block';
+    resultContainer.innerHTML = '';
+    updateGradingProgress(0, '채점 시작 중...');
+    
+    try {
+        const response = await fetch(`${API_BASE}/worksheets/${currentWorksheet.worksheet.id}/grade-canvas`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                multiple_choice_answers: mcAnswers,
+                canvas_answers: canvasData
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('채점 요청 실패');
+        }
+        
+        const result = await response.json();
+        activeTask = result.task_id;
+        
+        // 진행 상황 모니터링 시작
+        startGradingPolling();
+        
+    } catch (error) {
+        progressContainer.style.display = 'none';
+        alert('채점 오류: ' + error.message);
+    }
+}
+
+// 채점 진행률 업데이트
+function updateGradingProgress(percentage, status) {
+    const progressFill = document.querySelector('#grading-progress .progress-fill');
+    const progressText = document.querySelector('#grading-progress .progress-text');
+    
+    if (progressFill && progressText) {
+        progressFill.style.width = `${percentage}%`;
+        progressText.textContent = status;
+    }
+}
+
+// 채점 상태 폴링 시작
+function startGradingPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+    }
+    
+    pollingInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/tasks/${activeTask}`);
+            const data = await response.json();
+            
+            if (data.status === 'PROGRESS') {
+                updateGradingProgress(data.current || 0, data.message || '처리 중...');
+            } else if (data.status === 'SUCCESS') {
+                clearInterval(pollingInterval);
+                displayGradingResult(data.result);
+                document.getElementById('grading-progress').style.display = 'none';
+            } else if (data.status === 'FAILURE') {
+                clearInterval(pollingInterval);
+                document.getElementById('grading-progress').style.display = 'none';
+                alert('채점 실패: ' + data.error);
+            }
+        } catch (error) {
+            console.error('상태 확인 오류:', error);
+        }
+    }, 1000);
+}
+
+// 채점 결과 표시
+function displayGradingResult(result) {
+    const resultContainer = document.getElementById('grading-result');
+    
+    let resultHtml = `
+        <div class="result-item">
+            <h4>채점 완료</h4>
+            <div class="score-summary">
+                <p><strong>총 점수:</strong> ${result.total_score}점 / ${result.max_possible_score}점</p>
+                <p><strong>정답 개수:</strong> ${result.correct_count}개 / ${result.total_problems}개</p>
+                <p><strong>문제당 배점:</strong> ${result.points_per_problem}점</p>
+            </div>
+    `;
+    
+    if (result.ocr_text) {
+        resultHtml += `
+            <div class="ocr-result">
+                <h5>OCR 추출 텍스트:</h5>
+                <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">${result.ocr_text}</pre>
+            </div>
+        `;
+    }
+    
+    resultHtml += '<div class="detailed-results"><h5>문제별 채점 결과:</h5>';
+    
+    result.grading_results.forEach(item => {
+        const isCorrect = item.is_correct;
+        const borderColor = isCorrect ? '#27ae60' : '#e74c3c';
+        
+        resultHtml += `
+            <div class="result-item" style="border-color: ${borderColor}; margin-bottom: 15px;">
+                <h6>문제 ${item.problem_id} (${item.input_method || '알 수 없음'}) - ${item.score}점</h6>
+                <p><strong>학생 답안:</strong> ${item.user_answer || '없음'}</p>
+                <p><strong>정답:</strong> ${item.correct_answer}</p>
+                <p><strong>결과:</strong> ${isCorrect ? '정답' : '오답'}</p>
+                
+                ${item.ai_feedback ? `<p><strong>AI 피드백:</strong> ${item.ai_feedback}</p>` : ''}
+                ${item.strengths ? `<p><strong>잘한 점:</strong> ${item.strengths}</p>` : ''}
+                ${item.improvements ? `<p><strong>개선점:</strong> ${item.improvements}</p>` : ''}
+            </div>
+        `;
+    });
+    
+    resultHtml += '</div></div>';
+    
+    resultContainer.innerHTML = resultHtml;
+}
+
+// 캔버스 관련 변수
+let isDrawing = false;
+let canvasContexts = {};
+let currentColors = {};
+let currentLineWidths = {};
+
+// 캔버스 초기화
+function initializeCanvas(problemId) {
+    const canvas = document.getElementById(`canvas_${problemId}`);
+    const ctx = canvas.getContext('2d');
+    
+    // 캔버스 설정
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    
+    // 배경을 흰색으로 설정
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // 전역 변수에 저장
+    canvasContexts[problemId] = ctx;
+    currentColors[problemId] = '#000000';
+    currentLineWidths[problemId] = 2;
+}
+
+// 마우스 그리기 시작
+function startDrawing(e, problemId) {
+    isDrawing = true;
+    const canvas = document.getElementById(`canvas_${problemId}`);
+    const rect = canvas.getBoundingClientRect();
+    const ctx = canvasContexts[problemId];
+    
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+}
+
+// 마우스 그리기
+function draw(e, problemId) {
+    if (!isDrawing) return;
+    
+    const canvas = document.getElementById(`canvas_${problemId}`);
+    const rect = canvas.getBoundingClientRect();
+    const ctx = canvasContexts[problemId];
+    
+    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.stroke();
+}
+
+// 그리기 종료
+function stopDrawing() {
+    isDrawing = false;
+}
+
+// 터치 그리기 시작
+function startDrawingTouch(e, problemId) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const canvas = document.getElementById(`canvas_${problemId}`);
+    const rect = canvas.getBoundingClientRect();
+    const ctx = canvasContexts[problemId];
+    
+    isDrawing = true;
+    ctx.beginPath();
+    ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+}
+
+// 터치 그리기
+function drawTouch(e, problemId) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    
+    const touch = e.touches[0];
+    const canvas = document.getElementById(`canvas_${problemId}`);
+    const rect = canvas.getBoundingClientRect();
+    const ctx = canvasContexts[problemId];
+    
+    ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+    ctx.stroke();
+}
+
+// 캔버스 지우기
+function clearCanvas(problemId) {
+    const canvas = document.getElementById(`canvas_${problemId}`);
+    const ctx = canvasContexts[problemId];
+    
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = currentColors[problemId];
+}
+
+// 색상 변경
+function changeCanvasColor(problemId, color, buttonElement) {
+    const ctx = canvasContexts[problemId];
+    ctx.strokeStyle = color;
+    currentColors[problemId] = color;
+    
+    // 버튼 활성화 상태 변경
+    const canvasElement = document.getElementById(`canvas_${problemId}`);
+    const buttons = canvasElement.parentNode.querySelectorAll('.canvas-tools button');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    if (buttonElement) {
+        buttonElement.classList.add('active');
+    }
+}
+
+// 선 굵기 변경
+function changeLineWidth(problemId, width) {
+    const ctx = canvasContexts[problemId];
+    ctx.lineWidth = width;
+    currentLineWidths[problemId] = width;
 }

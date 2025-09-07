@@ -30,6 +30,7 @@ celery_app.conf.update(
     task_routes={
         "app.tasks.generate_math_problems_task": {"queue": "math_generation"},
         "app.tasks.grade_problems_task": {"queue": "grading"},
+        "app.tasks.grade_problems_mixed_task": {"queue": "grading"},
     },
 )
 

@@ -1,17 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Optional
 from celery.result import AsyncResult
 
 from ..database import get_db
 from ..schemas.math_generation import (
     MathProblemGenerationRequest, 
-    MathProblemGenerationResponse, 
-    CurriculumStructureResponse,
     SchoolLevel
 )
 from ..services.math_generation_service import MathGenerationService
-from ..tasks import generate_math_problems_task, grade_problems_task
+from ..tasks import generate_math_problems_task, grade_problems_task, grade_problems_mixed_task
 from ..celery_app import celery_app
 
 router = APIRouter()
@@ -390,10 +388,10 @@ async def get_worksheet_detail(
 @router.post("/worksheets/{worksheet_id}/grade")
 async def grade_worksheet(
     worksheet_id: int,
-    answers: dict,  # {"problem_id": "answer", ...} 형태
+    answer_sheet: UploadFile = File(..., description="답안지 이미지 파일"),
     db: Session = Depends(get_db)
 ):
-    """워크시트 채점 (비동기)"""
+    """워크시트 채점 (비동기) - OCR 기반"""
     try:
         # 워크시트 존재 확인
         from ..models.worksheet import Worksheet
@@ -404,17 +402,36 @@ async def grade_worksheet(
                 detail="워크시트를 찾을 수 없습니다."
             )
         
+        # 이미지 파일 검증
+        if not answer_sheet:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="답안지 이미지가 필요합니다."
+            )
+        
+        # 파일 확장자 검증
+        allowed_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
+        if not any(answer_sheet.filename.lower().endswith(ext) for ext in allowed_extensions):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="지원되는 이미지 형식: JPG, PNG, BMP, TIFF"
+            )
+        
+        # 이미지 데이터 읽기
+        image_data = await answer_sheet.read()
+        
         # Celery 태스크 시작
         task = grade_problems_task.delay(
             worksheet_id=worksheet_id,
-            answers=answers,
+            image_data=image_data,
             user_id=1
         )
         
         return {
             "task_id": task.id,
             "status": "PENDING",
-            "message": "채점이 시작되었습니다. /tasks/{task_id} 엔드포인트로 진행 상황을 확인하세요."
+            "message": "답안지 OCR 처리 및 채점이 시작되었습니다. /tasks/{task_id} 엔드포인트로 진행 상황을 확인하세요.",
+            "uploaded_file": answer_sheet.filename
         }
         
     except HTTPException:
@@ -423,4 +440,111 @@ async def grade_worksheet(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"채점 요청 중 오류 발생: {str(e)}"
+        )
+
+
+@router.post("/worksheets/{worksheet_id}/grade-canvas")
+async def grade_worksheet_canvas(
+    worksheet_id: int,
+    request: dict,  # {"multiple_choice_answers": {}, "canvas_answers": {}}
+    db: Session = Depends(get_db)
+):
+    """워크시트 캔버스 채점 - 객관식: 라디오 버튼, 주관식: 캔버스 그리기"""
+    try:
+        # 워크시트 존재 확인
+        from ..models.worksheet import Worksheet
+        worksheet = db.query(Worksheet).filter(Worksheet.id == worksheet_id).first()
+        if not worksheet:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="워크시트를 찾을 수 없습니다."
+            )
+        
+        # 요청 데이터 추출
+        multiple_choice_answers = request.get("multiple_choice_answers", {})
+        canvas_answers = request.get("canvas_answers", {})
+        
+        # 디버그 로그
+        print(f"🔍 디버그: canvas_answers 개수: {len(canvas_answers) if canvas_answers else 0}")
+        if canvas_answers:
+            for problem_id, canvas_data in canvas_answers.items():
+                if canvas_data:
+                    print(f"🔍 디버그: 문제 {problem_id} 캔버스 데이터 크기: {len(canvas_data)} bytes")
+        
+        # Celery 태스크 시작 - 개별 캔버스 데이터 전달
+        task = grade_problems_mixed_task.delay(
+            worksheet_id=worksheet_id,
+            multiple_choice_answers=multiple_choice_answers,
+            canvas_answers=canvas_answers,  # 개별 캔버스들 전달
+            user_id=1
+        )
+        
+        return {
+            "task_id": task.id,
+            "status": "PENDING",
+            "message": "캔버스 채점이 시작되었습니다. 객관식은 라디오 버튼으로, 주관식은 캔버스 그림으로 처리됩니다.",
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"캔버스 채점 요청 중 오류 발생: {str(e)}"
+        )
+
+
+@router.post("/worksheets/{worksheet_id}/grade-mixed")
+async def grade_worksheet_mixed(
+    worksheet_id: int,
+    multiple_choice_answers: dict = {},  # {"problem_id": "선택한_답안"} 형태
+    handwritten_answer_sheet: Optional[UploadFile] = File(None, description="손글씨 답안지 이미지 (서술형/단답형)"),
+    db: Session = Depends(get_db)
+):
+    """워크시트 혼합형 채점 - 객관식: 체크박스, 서술형/단답형: OCR"""
+    try:
+        # 워크시트 존재 확인
+        from ..models.worksheet import Worksheet
+        worksheet = db.query(Worksheet).filter(Worksheet.id == worksheet_id).first()
+        if not worksheet:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="워크시트를 찾을 수 없습니다."
+            )
+        
+        # 손글씨 이미지 데이터 읽기 (있는 경우만)
+        handwritten_image_data = None
+        if handwritten_answer_sheet and handwritten_answer_sheet.filename:
+            # 파일 확장자 검증
+            allowed_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
+            if not any(handwritten_answer_sheet.filename.lower().endswith(ext) for ext in allowed_extensions):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="지원되는 이미지 형식: JPG, PNG, BMP, TIFF"
+                )
+            handwritten_image_data = await handwritten_answer_sheet.read()
+        
+        # Celery 태스크 시작
+        task = grade_problems_mixed_task.delay(
+            worksheet_id=worksheet_id,
+            multiple_choice_answers=multiple_choice_answers,
+            handwritten_image_data=handwritten_image_data,
+            user_id=1
+        )
+        
+        return {
+            "task_id": task.id,
+            "status": "PENDING",
+            "message": "혼합형 채점이 시작되었습니다. 객관식은 체크박스로, 서술형/단답형은 OCR로 처리됩니다.",
+            "multiple_choice_count": len(multiple_choice_answers),
+            "has_handwritten_answers": handwritten_image_data is not None,
+            "handwritten_file": handwritten_answer_sheet.filename if handwritten_answer_sheet else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"혼합형 채점 요청 중 오류 발생: {str(e)}"
         )
