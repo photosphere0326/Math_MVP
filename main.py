@@ -4,6 +4,11 @@ from fastapi.staticfiles import StaticFiles
 from app.routers import math_generation
 from app.database import engine
 from app.models import Base
+# Import all models to ensure they are registered with Base.metadata
+import app.models.worksheet
+import app.models.problem
+import app.models.math_generation
+import app.models.grading_result
 
 Base.metadata.create_all(bind=engine)
 

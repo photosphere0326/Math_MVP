@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from celery.result import AsyncResult
+import asyncio
+import json
 
 from ..database import get_db
 from ..schemas.math_generation import (
@@ -21,7 +24,6 @@ async def get_curriculum_structure(
     school_level: Optional[SchoolLevel] = Query(None, description="학교급 필터"),
     db: Session = Depends(get_db)
 ):
-    """교육과정 구조 조회 - 초/중/고 > 학년 > 학기 > 단원 > 소단원"""
     try:
         structure = math_service.get_curriculum_structure(
             db, 
@@ -37,7 +39,6 @@ async def get_curriculum_structure(
 
 @router.get("/curriculum/units")
 async def get_units():
-    """대단원 목록 조회"""
     try:
         units = math_service.get_units()
         return {"units": units}
@@ -50,7 +51,6 @@ async def get_units():
 
 @router.get("/curriculum/chapters")
 async def get_chapters_by_unit(unit_name: str = Query(..., description="대단원명")):
-    """특정 대단원의 소단원 목록 조회"""
     try:
         chapters = math_service.get_chapters_by_unit(unit_name)
         return {"chapters": chapters}
@@ -66,24 +66,7 @@ async def generate_math_problems(
     request: MathProblemGenerationRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    수학 문제 생성 (비동기)
-    
-    단계별 선택:
-    1. 초/중/고 선택
-    2. 학년 선택 (초: 1-6, 중고: 1-3)
-    3. 학기 선택 (1학기/2학기)
-    4. 단원 선택 (I, II, III, IV)
-    5. 소단원(챕터) 선택
-    6. 총 문제수 설정 (10문제 or 20문제)
-    7. 난이도 비율 선택 (A:B:C)
-    8. 유형 비율 선택 (객관식:주관식:단답형)
-    9. 세부사항 텍스트 입력
-    
-    반환값: task_id를 통해 진행 상황을 추적할 수 있습니다.
-    """
     try:
-        # Celery 태스크 시작
         task = generate_math_problems_task.delay(
             request_data=request.model_dump(),
             user_id=1
@@ -113,7 +96,6 @@ async def get_generation_history(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """문제 생성 이력 조회"""
     try:
         history = math_service.get_generation_history(db, user_id=1, skip=skip, limit=limit)
         
@@ -144,7 +126,6 @@ async def get_generation_detail(
     generation_id: str,
     db: Session = Depends(get_db)
 ):
-    """특정 생성 세션 상세 조회"""
     try:
         session = math_service.get_generation_detail(db, generation_id, user_id=1)
         if not session:
@@ -153,11 +134,8 @@ async def get_generation_detail(
                 detail="해당 생성 세션을 찾을 수 없습니다"
             )
         
-        # 생성된 문제들 조회 (generation_id로 워크시트를 찾은 후 문제들 조회)
         from ..models.problem import Problem
         from ..models.worksheet import Worksheet
-        
-        # generation_id로 워크시트 찾기
         worksheet = db.query(Worksheet)\
             .filter(Worksheet.generation_id == generation_id)\
             .first()
@@ -168,7 +146,6 @@ async def get_generation_detail(
                 detail="해당 생성 세션의 워크시트를 찾을 수 없습니다"
             )
         
-        # 워크시트의 문제들 조회
         problems = db.query(Problem)\
             .filter(Problem.worksheet_id == worksheet.id)\
             .order_by(Problem.sequence_order)\
@@ -220,7 +197,6 @@ async def get_generation_detail(
 
 @router.get("/tasks/{task_id}")
 async def get_task_status(task_id: str):
-    """태스크 상태 및 결과 조회"""
     try:
         result = AsyncResult(task_id, app=celery_app)
         
@@ -263,13 +239,91 @@ async def get_task_status(task_id: str):
         )
 
 
+@router.get("/tasks/{task_id}/stream")
+async def stream_task_status(task_id: str):
+    """SSE를 통한 실시간 태스크 상태 스트리밍"""
+    
+    async def event_stream() -> AsyncGenerator[str, None]:
+        try:
+            result = AsyncResult(task_id, app=celery_app)
+            
+            while True:
+                # 태스크 상태 확인
+                if result.state == 'PENDING':
+                    data = {
+                        "task_id": task_id,
+                        "status": "PENDING",
+                        "message": "태스크가 대기 중입니다."
+                    }
+                elif result.state == 'PROGRESS':
+                    data = {
+                        "task_id": task_id,
+                        "status": "PROGRESS",
+                        "current": result.info.get('current', 0),
+                        "total": result.info.get('total', 100),
+                        "message": result.info.get('status', '처리 중...')
+                    }
+                elif result.state == 'SUCCESS':
+                    data = {
+                        "task_id": task_id,
+                        "status": "SUCCESS",
+                        "result": result.result
+                    }
+                    # 성공 시 스트림 종료
+                    yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    break
+                elif result.state == 'FAILURE':
+                    data = {
+                        "task_id": task_id,
+                        "status": "FAILURE",
+                        "error": str(result.info) if result.info else "알 수 없는 오류가 발생했습니다."
+                    }
+                    # 실패 시 스트림 종료
+                    yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    break
+                else:
+                    data = {
+                        "task_id": task_id,
+                        "status": result.state,
+                        "info": result.info
+                    }
+                
+                # SSE 형식으로 데이터 전송
+                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                
+                # 태스크가 완료되었으면 종료
+                if result.state in ['SUCCESS', 'FAILURE']:
+                    break
+                
+                # 1초 대기
+                await asyncio.sleep(1)
+                
+        except Exception as e:
+            error_data = {
+                "task_id": task_id,
+                "status": "ERROR",
+                "error": f"스트리밍 중 오류: {str(e)}"
+            }
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+    
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control"
+        }
+    )
+
+
 @router.get("/worksheets")
 async def get_worksheets(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """워크시트 목록 조회"""
     try:
         from ..models.worksheet import Worksheet
         
@@ -314,7 +368,6 @@ async def get_worksheet_detail(
     worksheet_id: int,
     db: Session = Depends(get_db)
 ):
-    """워크시트 상세 조회"""
     try:
         from ..models.worksheet import Worksheet
         from ..models.problem import Problem
@@ -329,7 +382,6 @@ async def get_worksheet_detail(
                 detail="워크시트를 찾을 수 없습니다."
             )
         
-        # 워크시트의 문제들 조회
         problems = db.query(Problem)\
             .filter(Problem.worksheet_id == worksheet_id)\
             .order_by(Problem.sequence_order)\
@@ -391,9 +443,7 @@ async def grade_worksheet(
     answer_sheet: UploadFile = File(..., description="답안지 이미지 파일"),
     db: Session = Depends(get_db)
 ):
-    """워크시트 채점 (비동기) - OCR 기반"""
     try:
-        # 워크시트 존재 확인
         from ..models.worksheet import Worksheet
         worksheet = db.query(Worksheet).filter(Worksheet.id == worksheet_id).first()
         if not worksheet:
@@ -402,14 +452,12 @@ async def grade_worksheet(
                 detail="워크시트를 찾을 수 없습니다."
             )
         
-        # 이미지 파일 검증
         if not answer_sheet:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="답안지 이미지가 필요합니다."
             )
         
-        # 파일 확장자 검증
         allowed_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
         if not any(answer_sheet.filename.lower().endswith(ext) for ext in allowed_extensions):
             raise HTTPException(
@@ -417,10 +465,8 @@ async def grade_worksheet(
                 detail="지원되는 이미지 형식: JPG, PNG, BMP, TIFF"
             )
         
-        # 이미지 데이터 읽기
         image_data = await answer_sheet.read()
         
-        # Celery 태스크 시작
         task = grade_problems_task.delay(
             worksheet_id=worksheet_id,
             image_data=image_data,
@@ -446,38 +492,36 @@ async def grade_worksheet(
 @router.post("/worksheets/{worksheet_id}/grade-canvas")
 async def grade_worksheet_canvas(
     worksheet_id: int,
-    request: dict,  # {"multiple_choice_answers": {}, "canvas_answers": {}}
+    request: dict,
     db: Session = Depends(get_db)
 ):
-    """워크시트 캔버스 채점 - 객관식: 라디오 버튼, 주관식: 캔버스 그리기"""
     try:
-        # 워크시트 존재 확인
+        print(f"🔍 채점 요청 시작: worksheet_id={worksheet_id}")
+        
         from ..models.worksheet import Worksheet
         worksheet = db.query(Worksheet).filter(Worksheet.id == worksheet_id).first()
         if not worksheet:
+            print(f"❌ 워크시트 {worksheet_id}를 찾을 수 없음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="워크시트를 찾을 수 없습니다."
             )
         
-        # 요청 데이터 추출
+        print(f"✅ 워크시트 발견: {worksheet.title}")
+        
         multiple_choice_answers = request.get("multiple_choice_answers", {})
         canvas_answers = request.get("canvas_answers", {})
         
-        # 디버그 로그
-        print(f"🔍 디버그: canvas_answers 개수: {len(canvas_answers) if canvas_answers else 0}")
-        if canvas_answers:
-            for problem_id, canvas_data in canvas_answers.items():
-                if canvas_data:
-                    print(f"🔍 디버그: 문제 {problem_id} 캔버스 데이터 크기: {len(canvas_data)} bytes")
+        print(f"🔍 요청 데이터: MC답안={len(multiple_choice_answers)}, 캔버스답안={len(canvas_answers)}")
         
-        # Celery 태스크 시작 - 개별 캔버스 데이터 전달
         task = grade_problems_mixed_task.delay(
             worksheet_id=worksheet_id,
             multiple_choice_answers=multiple_choice_answers,
-            canvas_answers=canvas_answers,  # 개별 캔버스들 전달
+            canvas_answers=canvas_answers,
             user_id=1
         )
+        
+        print(f"✅ Celery 태스크 시작: {task.id}")
         
         return {
             "task_id": task.id,
@@ -488,6 +532,10 @@ async def grade_worksheet_canvas(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ 채점 요청 오류: {str(e)}")
+        print(f"❌ 오류 타입: {type(e).__name__}")
+        import traceback
+        print(f"❌ 스택 트레이스: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"캔버스 채점 요청 중 오류 발생: {str(e)}"
@@ -497,13 +545,11 @@ async def grade_worksheet_canvas(
 @router.post("/worksheets/{worksheet_id}/grade-mixed")
 async def grade_worksheet_mixed(
     worksheet_id: int,
-    multiple_choice_answers: dict = {},  # {"problem_id": "선택한_답안"} 형태
+    multiple_choice_answers: dict = {},
     handwritten_answer_sheet: Optional[UploadFile] = File(None, description="손글씨 답안지 이미지 (서술형/단답형)"),
     db: Session = Depends(get_db)
 ):
-    """워크시트 혼합형 채점 - 객관식: 체크박스, 서술형/단답형: OCR"""
     try:
-        # 워크시트 존재 확인
         from ..models.worksheet import Worksheet
         worksheet = db.query(Worksheet).filter(Worksheet.id == worksheet_id).first()
         if not worksheet:
@@ -512,10 +558,8 @@ async def grade_worksheet_mixed(
                 detail="워크시트를 찾을 수 없습니다."
             )
         
-        # 손글씨 이미지 데이터 읽기 (있는 경우만)
         handwritten_image_data = None
         if handwritten_answer_sheet and handwritten_answer_sheet.filename:
-            # 파일 확장자 검증
             allowed_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
             if not any(handwritten_answer_sheet.filename.lower().endswith(ext) for ext in allowed_extensions):
                 raise HTTPException(
@@ -524,7 +568,6 @@ async def grade_worksheet_mixed(
                 )
             handwritten_image_data = await handwritten_answer_sheet.read()
         
-        # Celery 태스크 시작
         task = grade_problems_mixed_task.delay(
             worksheet_id=worksheet_id,
             multiple_choice_answers=multiple_choice_answers,
@@ -547,4 +590,249 @@ async def grade_worksheet_mixed(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"혼합형 채점 요청 중 오류 발생: {str(e)}"
+        )
+
+
+@router.put("/worksheets/{worksheet_id}")
+async def update_worksheet(
+    worksheet_id: int,
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    try:
+        from ..models.worksheet import Worksheet
+        from ..models.problem import Problem
+        
+        worksheet = db.query(Worksheet)\
+            .filter(Worksheet.id == worksheet_id, Worksheet.created_by == 1)\
+            .first()
+        
+        if not worksheet:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="워크시트를 찾을 수 없습니다."
+            )
+        
+        if "title" in request:
+            worksheet.title = request["title"]
+        if "user_prompt" in request:
+            worksheet.user_prompt = request["user_prompt"]
+        if "difficulty_ratio" in request:
+            worksheet.difficulty_ratio = request["difficulty_ratio"]
+        if "problem_type_ratio" in request:
+            worksheet.problem_type_ratio = request["problem_type_ratio"]
+        
+        if "problems" in request:
+            for problem_data in request["problems"]:
+                problem_id = problem_data.get("id")
+                if problem_id:
+                    problem = db.query(Problem)\
+                        .filter(Problem.id == problem_id, Problem.worksheet_id == worksheet_id)\
+                        .first()
+                    
+                    if problem:
+                        if "question" in problem_data:
+                            problem.question = problem_data["question"]
+                        if "choices" in problem_data:
+                            import json
+                            problem.choices = json.dumps(problem_data["choices"], ensure_ascii=False)
+                        if "correct_answer" in problem_data:
+                            problem.correct_answer = problem_data["correct_answer"]
+                        if "explanation" in problem_data:
+                            problem.explanation = problem_data["explanation"]
+                        if "difficulty" in problem_data:
+                            problem.difficulty = problem_data["difficulty"]
+                        if "problem_type" in problem_data:
+                            problem.problem_type = problem_data["problem_type"]
+                        if "latex_content" in problem_data:
+                            problem.latex_content = problem_data["latex_content"]
+        
+        db.commit()
+        db.refresh(worksheet)
+        
+        return {
+            "message": "워크시트가 성공적으로 수정되었습니다.",
+            "worksheet_id": worksheet_id,
+            "updated_at": worksheet.updated_at.isoformat() if worksheet.updated_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"워크시트 수정 중 오류 발생: {str(e)}"
+        )
+
+
+@router.put("/problems/{problem_id}")
+async def update_problem(
+    problem_id: int,
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    try:
+        from ..models.problem import Problem
+        
+        problem = db.query(Problem)\
+            .join(Problem.worksheet)\
+            .filter(Problem.id == problem_id)\
+            .first()
+        
+        if not problem:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="문제를 찾을 수 없습니다."
+            )
+        
+        if "question" in request:
+            problem.question = request["question"]
+        if "choices" in request:
+            import json
+            problem.choices = json.dumps(request["choices"], ensure_ascii=False)
+        if "correct_answer" in request:
+            problem.correct_answer = request["correct_answer"]
+        if "explanation" in request:
+            problem.explanation = request["explanation"]
+        if "difficulty" in request:
+            problem.difficulty = request["difficulty"]
+        if "problem_type" in request:
+            problem.problem_type = request["problem_type"]
+        if "latex_content" in request:
+            problem.latex_content = request["latex_content"]
+        
+        db.commit()
+        db.refresh(problem)
+        
+        return {
+            "message": "문제가 성공적으로 수정되었습니다.",
+            "problem_id": problem_id,
+            "updated_at": problem.updated_at.isoformat() if problem.updated_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"문제 수정 중 오류 발생: {str(e)}"
+        )
+
+
+@router.get("/grading-history")
+async def get_grading_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    worksheet_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """채점 이력 조회"""
+    try:
+        from ..models.grading_result import GradingSession
+        
+        query = db.query(GradingSession).filter(GradingSession.graded_by == 1)
+        
+        if worksheet_id:
+            query = query.filter(GradingSession.worksheet_id == worksheet_id)
+        
+        grading_sessions = query.order_by(GradingSession.graded_at.desc())\
+            .offset(skip)\
+            .limit(limit)\
+            .all()
+        
+        result = []
+        for session in grading_sessions:
+            result.append({
+                "grading_session_id": session.id,
+                "worksheet_id": session.worksheet_id,
+                "total_problems": session.total_problems,
+                "correct_count": session.correct_count,
+                "total_score": session.total_score,
+                "max_possible_score": session.max_possible_score,
+                "points_per_problem": session.points_per_problem,
+                "input_method": session.input_method,
+                "graded_at": session.graded_at.isoformat(),
+                "celery_task_id": session.celery_task_id
+            })
+        
+        return {"grading_history": result, "total": len(result)}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"채점 이력 조회 중 오류: {str(e)}"
+        )
+
+
+@router.get("/grading-history/{grading_session_id}")
+async def get_grading_session_detail(
+    grading_session_id: int,
+    db: Session = Depends(get_db)
+):
+    """채점 세션 상세 조회"""
+    try:
+        from ..models.grading_result import GradingSession, ProblemGradingResult
+        
+        session = db.query(GradingSession)\
+            .filter(GradingSession.id == grading_session_id, GradingSession.graded_by == 1)\
+            .first()
+        
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="채점 세션을 찾을 수 없습니다"
+            )
+        
+        problem_results = db.query(ProblemGradingResult)\
+            .filter(ProblemGradingResult.grading_session_id == grading_session_id)\
+            .all()
+        
+        problem_list = []
+        for result in problem_results:
+            problem_dict = {
+                "problem_id": result.problem_id,
+                "user_answer": result.user_answer,
+                "actual_user_answer": result.actual_user_answer,
+                "correct_answer": result.correct_answer,
+                "is_correct": result.is_correct,
+                "score": result.score,
+                "points_per_problem": result.points_per_problem,
+                "problem_type": result.problem_type,
+                "input_method": result.input_method,
+                "ai_score": result.ai_score,
+                "ai_feedback": result.ai_feedback,
+                "strengths": result.strengths,
+                "improvements": result.improvements,
+                "keyword_score_ratio": result.keyword_score_ratio,
+                "explanation": result.explanation
+            }
+            problem_list.append(problem_dict)
+        
+        return {
+            "grading_session": {
+                "id": session.id,
+                "worksheet_id": session.worksheet_id,
+                "total_problems": session.total_problems,
+                "correct_count": session.correct_count,
+                "total_score": session.total_score,
+                "max_possible_score": session.max_possible_score,
+                "points_per_problem": session.points_per_problem,
+                "ocr_text": session.ocr_text,
+                "ocr_results": session.ocr_results,
+                "multiple_choice_answers": session.multiple_choice_answers,
+                "input_method": session.input_method,
+                "graded_at": session.graded_at.isoformat(),
+                "celery_task_id": session.celery_task_id
+            },
+            "problem_results": problem_list
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"채점 세션 상세 조회 중 오류: {str(e)}"
         )

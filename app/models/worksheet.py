@@ -6,11 +6,11 @@ import enum
 
 
 class WorksheetStatus(str, enum.Enum):
-    DRAFT = "draft"          # 임시저장
-    PROCESSING = "processing"  # 생성 중
-    COMPLETED = "completed"  # 완성
-    FAILED = "failed"        # 생성 실패
-    PUBLISHED = "published"  # 발행됨
+    DRAFT = "draft"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PUBLISHED = "published"
 
 
 class Worksheet(Base):

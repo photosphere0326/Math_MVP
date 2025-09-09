@@ -1,7 +1,6 @@
 import os
 import json
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from google.cloud import vision
 from typing import Dict, List
 from dotenv import load_dotenv
@@ -11,9 +10,8 @@ load_dotenv()
 class AIService:
     def __init__(self):
         # Gemini API 키 설정
-        self.client = genai.Client(
-            api_key=os.getenv("GEMINI_API_KEY", "AIzaSyCOX4_nCgcCTTvIf-abckxtC10xTMqzwzM")
-        )
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY", "AIzaSyCOX4_nCgcCTTvIf-abckxtC10xTMqzwzM"))
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Google Vision API 키 설정
         self.vision_api_key = "AIzaSyCVjBI7eFbggDVLZVU0hRloQk0HAgjp5vE"
@@ -49,101 +47,68 @@ class AIService:
             
             difficulty_distribution = f"모든 문제 {difficulty_level}단계"
 
-        # 참고 문제 가져오기 - 모든 난이도를 포함
-        reference_problems = self._get_reference_problems(
+        # 참고 문제 가져오기 - 난이도별 맞춤형 참고
+        reference_problems = self._get_smart_reference_problems(
             curriculum_data.get('chapter_name', ''), 
-            "ALL"  # 모든 난이도의 참고 문제 포함
+            difficulty_ratio if difficulty_ratio else {"A": 30, "B": 40, "C": 30}
         )
-        print(f"🔍 디버그: 챕터={curriculum_data.get('chapter_name')}")
-        print(f"📚 참고 문제: {reference_problems[:200]}...")
+        print(f" 디버그: 챕터={curriculum_data.get('chapter_name')}")
+        print(f" 참고 문제: {reference_problems[:200]}...")
 
         # 문제 개수는 매개변수로 전달받음 (기본값 1개)
 
-        prompt = f"""당신은 중학교 수학 문제 출제 전문가입니다. 교육과정에 맞는 정확하고 체계적인 문제를 생성해주세요.
+        prompt = f"""중학교 수학 문제 출제 전문가입니다. 다음 교육과정에 맞는 문제를 생성해주세요.
 
-교육과정 정보:
-- 학년: {curriculum_data.get('grade')} {curriculum_data.get('semester')}
-- 대단원: {curriculum_data.get('unit_name')}
-- 소단원: {curriculum_data.get('chapter_name')}
-- 학습목표: {curriculum_data.get('learning_objectives')}
-- 핵심 키워드: {curriculum_data.get('keywords')}
+ 교육과정: {curriculum_data.get('grade')} {curriculum_data.get('semester')} - {curriculum_data.get('unit_name')} > {curriculum_data.get('chapter_name')}
+ 사용자 요청: "{user_prompt}"
+ 난이도 분배: {difficulty_distribution}
 
-사용자 요청:
-"{user_prompt}"
+ **범용 난이도 기준** (모든 단원 적용):
 
-⭐ 중요한 난이도 분배 요구사항:
-{difficulty_distribution}
+**A단계 (기본/개념)**
+- 단일 개념의 직접적 적용
+- 정의, 공식을 그대로 사용하는 문제  
+- 1-2단계 계산으로 해결
+- 예시: 기본 공식 대입, 개념 확인, 용어 정의
+
+**B단계 (응용/연산)**  
+- 2-3개 개념을 조합한 문제
+- 여러 단계의 계산 과정 필요
+- 문제 상황을 수식으로 변환
+- 예시: 응용 문제, 도형의 성질 활용, 방정식 세우기
+
+**C단계 (심화/사고)**
+- 복합적 조건 분석이 필요
+- 여러 단원 지식을 융합
+- 창의적 접근이나 추론 과정 포함  
+- 예시: 조건 분석, 경우의 수, 증명 과정
 
 {reference_problems}
 
-생성 조건:
-1. 위 교육과정 범위 내에서 정확히 {problem_count}개 문제 생성
-2. 참고 문제의 스타일을 반영하되 완전히 새로운 문제 생성 (복사 금지)
-3. ⭐ 각 문제의 난이도를 위 분배 요구사항에 정확히 맞춰 생성 (가장 중요!)
-4. 사용자가 요청한 문제 유형(객관식/주관식)을 정확히 반영
-5. 명확하고 이해하기 쉬운 문제 설명
-6. 정확한 정답과 아름다운 단계별 해설 포함
-7. 해설은 반드시 다음 형식으로 작성:
-   - 복잡한 문제: "단계 1: [설명]", "단계 2: [설명]" 형식 사용
-   - 간단한 문제: 명확하고 간결한 설명
-   - 수식은 깔끔하고 읽기 쉬운 형태로 표기
-8. 수학 기호나 수식은 일반 텍스트로 표기 (LaTeX 사용하지 말것)
-8. 그림이 필요한 문제인 경우 문제에 "그림 참조" 표시
+ **생성 규칙**:
+1. 정확히 {problem_count}개 문제를 난이도 순서대로 생성
+2. 각 문제의 difficulty 필드를 분배에 맞게 정확히 설정
+3. 수학 표기: x², √16, 2³×5² (중학생 표준 표기법)
+4. 해설은 난이도에 맞게 간결하게 (A:1문장, B:2-3문장, C:3-4문장)
+5. 교육과정 범위를 벗어나지 않도록 주의
 
-⚠️ 중요: 
-- 반드시 정확히 {problem_count}개 문제를 JSON 배열 형태로 생성하세요!
-- 각 문제의 "difficulty" 필드를 위 난이도 분배에 맞춰 정확히 설정하세요!
-
-응답 형식 (JSON 배열 - {problem_count}개 문제):
+JSON 배열로 응답:
 [
   {{
     "question": "문제 내용",
-    "choices": ["선택지1", "선택지2", "선택지3", "선택지4"] (객관식인 경우, 주관식은 null),
+    "choices": ["①", "②", "③", "④"] 또는 null,
     "correct_answer": "정답",
-    "explanation": "단계별 해설 (복잡한 문제는 '단계 1:', '단계 2:' 형식으로, 간단한 문제는 명확한 설명으로)",
-    "problem_type": "multiple_choice" 또는 "short_answer" 또는 "essay",
-    "difficulty": "A" 또는 "B" 또는 "C" (위 분배에 맞춰),
+    "explanation": "간결한 해설",
+    "problem_type": "multiple_choice/short_answer/essay", 
+    "difficulty": "A/B/C",
     "has_diagram": true/false,
-    "diagram_type": "concentration" 또는 "train" 또는 "geometry" 또는 "graph" 등,
-    "diagram_elements": {{
-      "objects": ["비커", "소금물", "물"] 또는 ["열차", "다리", "터널"] 등 그려야 할 요소들,
-      "values": {{"농도": "10%", "양": "300g"}} 또는 {{"열차길이": "200m", "속력": "60km/h"}} 등 표시할 값들,
-      "labels": ["초기 상태", "최종 상태"] 등 라벨 정보
-    }}
-  }},
-  ... ({problem_count}개 문제까지)
-]
-
-📚 해설 작성 예시:
-
-**복잡한 문제의 경우:**
-"단계 1: 주어진 조건을 정리합니다. x + 3 = 7에서 x의 값을 구해야 합니다.
-단계 2: 양변에서 3을 빼줍니다. x + 3 - 3 = 7 - 3
-단계 3: 계산하면 x = 4가 됩니다.
-따라서 답은 x = 4입니다."
-
-**간단한 문제의 경우:**
-"등식은 등호(=)를 사용하여 두 식의 값이 같음을 나타내는 식입니다. 
-선택지 중 등호가 포함된 것은 3번 4x = 8입니다."
-
-다시 한번 강조: {problem_count}개 문제를 반드시 생성하세요!
-"""
+    "diagram_type": "geometry/coordinate/graph/algebra/etc",
+    "diagram_elements": {{"objects": [], "values": {{}}, "labels": []}}
+  }}
+]"""
 
         try:
-            from google.genai import types
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=prompt),
-                    ],
-                )
-            ]
-            
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=contents
-            )
+            response = self.model.generate_content(prompt)
             content = response.text
             
             # JSON 부분만 추출
@@ -167,11 +132,11 @@ class AIService:
     def ocr_handwriting(self, image_data: bytes) -> str:
         """Google Vision을 이용한 손글씨 OCR"""
         try:
-            print(f"🔍 OCR 디버그: image_data 타입: {type(image_data)}")
-            print(f"🔍 OCR 디버그: image_data 크기: {len(image_data) if image_data else 'None'}")
+            print(f" OCR 디버그: image_data 타입: {type(image_data)}")
+            print(f" OCR 디버그: image_data 크기: {len(image_data) if image_data else 'None'}")
             
             if not image_data:
-                print("🔍 OCR 디버그: image_data가 비어있음")
+                print(" OCR 디버그: image_data가 비어있음")
                 return ""
             
             # REST API 방식으로 Google Vision API 호출
@@ -204,29 +169,29 @@ class AIService:
                 'Content-Type': 'application/json'
             }
             
-            print(f"🔍 OCR 디버그: Google Vision API 호출 시작")
+            print(f" OCR 디버그: Google Vision API 호출 시작")
             response = requests.post(url, json=payload, headers=headers)
-            print(f"🔍 OCR 디버그: 응답 상태코드: {response.status_code}")
+            print(f" OCR 디버그: 응답 상태코드: {response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"🔍 OCR 디버그: 응답 데이터: {str(result)[:200]}...")
+                print(f" OCR 디버그: 응답 데이터: {str(result)[:200]}...")
                 
                 if 'responses' in result and result['responses']:
                     response_data = result['responses'][0]
                     if 'textAnnotations' in response_data and response_data['textAnnotations']:
                         detected_text = response_data['textAnnotations'][0]['description']
-                        print(f"🔍 OCR 디버그: 인식된 텍스트: {detected_text[:50]}...")
+                        print(f" OCR 디버그: 인식된 텍스트: {detected_text[:50]}...")
                         return detected_text.strip()
                     else:
-                        print("🔍 OCR 디버그: textAnnotations가 비어있음")
+                        print(" OCR 디버그: textAnnotations가 비어있음")
                         return ""
                 else:
-                    print("🔍 OCR 디버그: responses가 비어있음")
+                    print(" OCR 디버그: responses가 비어있음")
                     return ""
             else:
                 error_msg = response.text
-                print(f"🔍 OCR API 오류: {response.status_code} - {error_msg}")
+                print(f" OCR API 오류: {response.status_code} - {error_msg}")
                 return ""
                 
         except Exception as e:
@@ -299,20 +264,7 @@ class AIService:
 """
 
         try:
-            from google.genai import types
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=prompt),
-                    ],
-                )
-            ]
-            
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=contents
-            )
+            response = self.model.generate_content(prompt)
             content = response.text
             
             if "```json" in content:
@@ -335,6 +287,54 @@ class AIService:
             }
 
 
+
+    def _get_smart_reference_problems(self, chapter_name: str, difficulty_ratio: dict) -> str:
+        """난이도 분배에 맞춘 스마트 참고 문제 제공"""
+        try:
+            import os
+            import json
+            
+            problem_types_file_path = os.path.join(os.path.dirname(__file__), "../../data/math_problem_types.json")
+            
+            with open(problem_types_file_path, 'r', encoding='utf-8') as f:
+                problem_types_data = json.load(f)
+            
+            # 챕터명으로 문제 유형 찾기
+            chapter_problem_types = []
+            for chapter_data in problem_types_data["math_problem_types"]:
+                if chapter_data["chapter_name"] == chapter_name:
+                    chapter_problem_types = chapter_data["problem_types"]
+                    break
+            
+            if not chapter_problem_types:
+                return f"'{chapter_name}' 챕터의 참고 문제를 찾을 수 없습니다."
+            
+            # 난이도별 문제 유형 분배
+            total_types = len(chapter_problem_types)
+            a_types = chapter_problem_types[:total_types//3] if total_types >= 3 else [chapter_problem_types[0]]
+            b_types = chapter_problem_types[total_types//3:2*total_types//3] if total_types >= 6 else chapter_problem_types[1:2] if total_types >= 2 else []
+            c_types = chapter_problem_types[2*total_types//3:] if total_types >= 3 else chapter_problem_types[-1:] if total_types >= 3 else []
+            
+            # 요청된 난이도 비율에 따라 참고 문제 구성
+            reference_text = f" **{chapter_name} 참고 문제 유형:**\n\n"
+            
+            if difficulty_ratio.get('A', 0) > 0 and a_types:
+                reference_text += f" **A단계 유형**: {', '.join(a_types[:4])}\n"
+                reference_text += "   → 기본 개념과 정의를 직접 적용하는 문제로 변형\n\n"
+            
+            if difficulty_ratio.get('B', 0) > 0 and b_types:  
+                reference_text += f" **B단계 유형**: {', '.join(b_types[:4])}\n" 
+                reference_text += "   → 계산 과정과 공식 적용이 포함된 응용 문제로 변형\n\n"
+                
+            if difficulty_ratio.get('C', 0) > 0 and c_types:
+                reference_text += f" **C단계 유형**: {', '.join(c_types[:4])}\n"
+                reference_text += "   → 조건 분석과 종합적 사고가 필요한 심화 문제로 변형\n\n"
+            
+            return reference_text
+            
+        except Exception as e:
+            print(f"스마트 참고 문제 로드 오류: {str(e)}")
+            return f"'{chapter_name}' 참고 문제 로드 중 오류 발생"
 
     def _get_reference_problems(self, chapter_name: str, difficulty_level: str) -> str:
         """JSON 파일에서 챕터의 문제 유형들을 가져와서 참고 정보로 제공"""
@@ -368,9 +368,10 @@ class AIService:
 
 - {types_text}
 
-A단계: 기본 개념의 단순 적용
-B단계: 기본 개념의 확장 적용
-C단계: 심화 응용 및 창의적 사고 필요
+ 난이도별 문제 생성 가이드:
+A단계: 위 유형 중에서 가장 기본적인 개념만 사용하여 단순한 계산이나 정의 확인 문제로 변형
+B단계: 위 유형을 기반으로 2~3개 개념을 조합하거나 여러 단계의 풀이 과정이 필요한 문제로 변형
+C단계: 위 유형을 확장하여 창의적 접근이나 종합적 추론이 필요한 고난도 문제로 변형
                     """
                 else:
                     # 기존 로직 (특정 난이도)

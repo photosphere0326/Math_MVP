@@ -27,11 +27,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_acks_late=True,
     worker_max_tasks_per_child=1000,
-    task_routes={
-        "app.tasks.generate_math_problems_task": {"queue": "math_generation"},
-        "app.tasks.grade_problems_task": {"queue": "grading"},
-        "app.tasks.grade_problems_mixed_task": {"queue": "grading"},
-    },
+    # task_routes 제거 - 모든 태스크를 기본 celery 큐로 전송
 )
 
 # 태스크 발견을 위한 autodiscover

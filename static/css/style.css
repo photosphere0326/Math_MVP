@@ -957,3 +957,602 @@ header p {
     color: #495057;
     margin-top: 10px;
 }
+
+/* MathJax 수식 스타일 개선 */
+.tex2jax_process {
+    line-height: 1.8;
+    word-spacing: normal;
+}
+
+/* MathJax 수식이 포함된 컨테이너 */
+.MathJax_Display {
+    text-align: center !important;
+    margin: 1em 0 !important;
+}
+
+/* 인라인 수식 */
+.MathJax {
+    display: inline-block;
+    margin: 0 0.2em;
+}
+
+/* 문제 텍스트에서 수식 스타일 */
+.problem-content .MathJax {
+    font-size: 1.1em;
+}
+
+/* 선택지에서 수식 스타일 */
+.mc-choice .MathJax {
+    font-size: 1em;
+}
+
+/* 해설에서 수식 스타일 */
+.explanation .MathJax {
+    font-size: 1em;
+    color: #444;
+}
+
+/* 채점 결과에서 수식 스타일 */
+.grading-container .MathJax {
+    font-size: 1em;
+}
+
+/* 수식이 포함된 텍스트의 줄 간격 개선 */
+.problem-item p,
+.mc-choice,
+.explanation,
+.grading-container p {
+    line-height: 1.8;
+    word-break: keep-all;
+    word-wrap: break-word;
+}
+
+/* 수식 출력을 위한 여백 개선 */
+.problem-content,
+.choices,
+.explanation {
+    margin-bottom: 15px;
+}
+
+/* 한글과 수식이 혼재된 텍스트 스타일 개선 */
+.problem-content p,
+.explanation p,
+.choices p {
+    margin-bottom: 10px;
+}
+
+/* 수식 전후 적절한 여백 */
+.MathJax {
+    margin: 0 2px;
+}
+
+/* 강조된 텍스트 스타일 */
+strong {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* HTML 브레이크 라인 스타일 */
+br {
+    line-height: 1.5;
+}
+
+/* MathJax 로딩 중일 때 깜빡임 방지 */
+.MathJax_Preview {
+    color: #888;
+    font-style: italic;
+}
+
+/* 수식이 긴 경우 줄바꿈 처리 */
+.MathJax_Display {
+    overflow-x: auto;
+    padding: 0 5px;
+}
+
+/* 모바일에서 수식 가독성 개선 */
+@media (max-width: 768px) {
+    .MathJax_Display {
+        font-size: 0.9em;
+    }
+    
+    .MathJax {
+        font-size: 0.95em;
+    }
+    
+    .problem-item p,
+    .mc-choice,
+    .explanation,
+    .grading-container p {
+        line-height: 2.0;
+    }
+}
+
+/* 편집 관련 스타일 */
+.edit-worksheet {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.edit-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.save-btn {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.save-btn:hover {
+    background-color: #219a52;
+}
+
+.cancel-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.cancel-btn:hover {
+    background-color: #c0392b;
+}
+
+.worksheet-info-edit {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+}
+
+.worksheet-info-edit h4 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ecf0f1;
+    padding-bottom: 10px;
+}
+
+.edit-input, .edit-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.3s;
+}
+
+.edit-input:focus, .edit-textarea:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+.problems-edit {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.problems-edit h4 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #ecf0f1;
+    padding-bottom: 10px;
+}
+
+.problem-edit-item {
+    background-color: #fdfdfd;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.problem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.problem-header h5 {
+    color: #2c3e50;
+    font-size: 1.2em;
+    margin: 0;
+}
+
+.problem-meta {
+    display: flex;
+    gap: 10px;
+}
+
+.problem-type, .problem-difficulty {
+    background-color: #ecf0f1;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #7f8c8d;
+    font-weight: bold;
+}
+
+.problem-edit-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.choices-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.choice-edit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.choice-edit label {
+    min-width: 60px;
+    font-size: 13px;
+    color: #666;
+}
+
+.choice-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.problem-difficulty-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+}
+
+/* 편집 페이지용 새로고침 버튼 오버라이드 */
+.edit-tab .refresh-btn {
+    background-color: #f39c12;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 10px;
+    transition: background-color 0.3s;
+}
+
+.edit-tab .refresh-btn:hover {
+    background-color: #e67e22;
+}
+
+/* 편집 모드용 반응형 스타일 */
+@media (max-width: 768px) {
+    .edit-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .edit-controls {
+        justify-content: space-between;
+    }
+    
+    .problem-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .problem-meta {
+        align-self: flex-end;
+    }
+    
+    .choice-edit {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+    }
+    
+    .choice-edit label {
+        min-width: auto;
+    }
+}
+
+/* 채점 이력 탭 스타일 */
+.grading-history-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+
+.filter-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-section label {
+    font-weight: 500;
+    min-width: max-content;
+}
+
+.filter-section select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    min-width: 200px;
+}
+
+.grading-history-item {
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.grading-history-item:hover {
+    background: #f0f8ff;
+    border-color: #3498db;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+.history-header h4 {
+    color: #2c3e50;
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.grading-date {
+    color: #7f8c8d;
+    font-size: 0.9em;
+    font-weight: normal;
+}
+
+.history-info {
+    margin-bottom: 15px;
+}
+
+.history-info .info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 5px 0;
+}
+
+.history-info .info-row span {
+    flex: 1;
+}
+
+.history-info .info-row span:first-child {
+    margin-right: 20px;
+}
+
+.history-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.history-actions .btn-secondary {
+    background-color: #95a5a6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.history-actions .btn-secondary:hover {
+    background-color: #7f8c8d;
+}
+
+.history-actions .btn-secondary:first-child {
+    background-color: #3498db;
+}
+
+.history-actions .btn-secondary:first-child:hover {
+    background-color: #2980b9;
+}
+
+/* 채점 상세 결과 스타일 */
+.grading-session-info {
+    background: #e8f4f8;
+    border: 1px solid #bde5f0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.grading-session-info h4 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.3em;
+}
+
+.session-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 10px;
+}
+
+.session-meta p {
+    margin: 5px 0;
+    padding: 5px 0;
+}
+
+.ocr-result-section, .mc-answers-section {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.ocr-result-section h5, .mc-answers-section h5 {
+    color: #495057;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+.problem-results-section {
+    margin-top: 20px;
+}
+
+.problem-results-section h5 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 8px;
+}
+
+.problem-result-item {
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.problem-result-item:hover {
+    transform: translateX(5px);
+}
+
+.problem-result-item h6 {
+    color: #2c3e50;
+    margin-bottom: 12px;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.problem-result-item p {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+.problem-result-item .explanation {
+    background: rgba(52, 152, 219, 0.1);
+    border-left: 4px solid #3498db;
+    padding: 12px;
+    margin-top: 12px;
+    border-radius: 4px;
+}
+
+.no-data {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #dee2e6;
+}
+
+.no-data p {
+    color: #6c757d;
+    font-size: 1.1em;
+    margin-bottom: 10px;
+}
+
+.no-data p:last-child {
+    font-size: 0.9em;
+    color: #adb5bd;
+}
+
+/* 채점 이력 반응형 스타일 */
+@media (max-width: 768px) {
+    .grading-history-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+    
+    .filter-section {
+        justify-content: space-between;
+    }
+    
+    .filter-section select {
+        min-width: 150px;
+        flex: 1;
+    }
+    
+    .history-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .history-info .info-row {
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 12px;
+    }
+    
+    .history-info .info-row span:first-child {
+        margin-right: 0;
+        font-weight: 600;
+    }
+    
+    .history-actions {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .session-meta {
+        grid-template-columns: 1fr;
+    }
+    
+    .problem-result-item:hover {
+        transform: none;
+    }
+}

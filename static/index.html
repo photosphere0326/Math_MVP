@@ -6,6 +6,31 @@
     <title>수학 문제 생성기 테스트</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- MathJax 설정 -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processHtmlTags: true,
+                packages: {'[+]': ['ams', 'cases', 'cancel']}
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            },
+            startup: {
+                ready: () => {
+                    console.log('MathJax 준비 완료');
+                    MathJax.startup.defaultReady();
+                }
+            }
+        };
+    </script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
     <div class="container">
@@ -17,7 +42,9 @@
         <div class="tabs">
             <button class="tab-button active" onclick="showTab('generation')">문제 생성</button>
             <button class="tab-button" onclick="showTab('worksheets')">문제지 이력</button>
+            <button class="tab-button" onclick="showTab('edit')">문제지 편집</button>
             <button class="tab-button" onclick="showTab('grading')">채점</button>
+            <button class="tab-button" onclick="showTab('grading-history')">채점 이력</button>
             <button class="tab-button" onclick="showTab('status')">태스크 상태</button>
         </div>
 
@@ -131,6 +158,55 @@
             </div>
         </div>
 
+        <!-- 문제지 편집 탭 -->
+        <div id="edit-tab" class="tab-content">
+            <div class="form-section">
+                <h3>문제지 편집</h3>
+                <div class="worksheet-selection">
+                    <label for="worksheet-select-edit">편집할 문제지 선택:</label>
+                    <select id="worksheet-select-edit">
+                        <option value="">문제지를 선택하세요</option>
+                    </select>
+                    <button onclick="loadWorksheetsForEdit()" class="refresh-btn">새로고침</button>
+                </div>
+                <button onclick="loadWorksheetForEdit()" class="btn-primary">편집 시작</button>
+            </div>
+
+            <!-- 편집 영역 -->
+            <div id="edit-worksheet" class="edit-worksheet" style="display: none;">
+                <div class="edit-header">
+                    <h3>문제지 편집</h3>
+                    <div class="edit-controls">
+                        <button onclick="saveWorksheet()" class="save-btn">저장</button>
+                        <button onclick="cancelEdit()" class="cancel-btn">취소</button>
+                    </div>
+                </div>
+
+                <!-- 워크시트 기본 정보 편집 -->
+                <div class="worksheet-info-edit">
+                    <h4>기본 정보</h4>
+                    <div class="form-group">
+                        <label for="edit-title">제목:</label>
+                        <input type="text" id="edit-title" class="edit-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-user-prompt">세부 요청사항:</label>
+                        <textarea id="edit-user-prompt" class="edit-textarea" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- 문제 목록 편집 -->
+                <div class="problems-edit">
+                    <h4>문제 목록</h4>
+                    <div id="problems-list-edit"></div>
+                </div>
+            </div>
+
+            <div class="result-section">
+                <div id="edit-result"></div>
+            </div>
+        </div>
+
         <!-- 채점 탭 -->
         <div id="grading-tab" class="tab-content">
             <div class="worksheet-selection-section">
@@ -198,6 +274,32 @@
                     </div>
                     <div class="progress-text">채점 중...</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- 채점 이력 탭 -->
+        <div id="grading-history-tab" class="tab-content">
+            <div class="form-section">
+                <h3>채점 이력 관리</h3>
+                <div class="grading-history-controls">
+                    <button onclick="loadGradingHistory()" class="btn-primary">채점 이력 새로고침</button>
+                    <div class="filter-section">
+                        <label for="worksheet-filter">문제지별 필터:</label>
+                        <select id="worksheet-filter" onchange="filterGradingHistory()">
+                            <option value="">전체 보기</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="result-section">
+                <h3>채점 이력 목록</h3>
+                <div id="grading-history-list"></div>
+            </div>
+
+            <div class="result-section" id="grading-detail-section" style="display: none;">
+                <h3>채점 상세 결과</h3>
+                <div id="grading-detail"></div>
             </div>
         </div>
 

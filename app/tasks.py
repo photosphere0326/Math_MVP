@@ -208,7 +208,7 @@ def generate_math_problems_task(self, request_data: dict, user_id: int):
 
 
 @celery_app.task(bind=True, name="app.tasks.grade_problems_mixed_task")
-def grade_problems_mixed_task(self, worksheet_id: int, multiple_choice_answers: dict, canvas_answers: dict, user_id: int):
+def grade_problems_mixed_task(self, worksheet_id: int, multiple_choice_answers: dict, canvas_answers: dict, user_id: int, handwritten_image_data: dict = None):
     """혼합형 채점 태스크 - 객관식: 체크박스, 서술형/단답형: OCR"""
     
     task_id = self.request.id
@@ -253,9 +253,11 @@ def grade_problems_mixed_task(self, worksheet_id: int, multiple_choice_answers: 
                         handwritten_image_data = base64.b64decode(image_data)
                         
                         # 문제별 OCR 처리
-                        ocr_text = ai_service.ocr_handwriting(handwritten_image_data)
-                        ocr_results[problem_id] = ocr_text
-                        print(f"🔍 디버그: 문제 {problem_id} OCR 결과: {ocr_text[:50]}...")
+                        raw_ocr_text = ai_service.ocr_handwriting(handwritten_image_data)
+                        normalized_ocr_text = _normalize_fraction_text(raw_ocr_text)
+                        ocr_results[problem_id] = normalized_ocr_text
+                        print(f"🔍 디버그: 문제 {problem_id} OCR 원본: {raw_ocr_text[:50]}...")
+                        print(f"🔍 디버그: 문제 {problem_id} OCR 정규화: {normalized_ocr_text[:50]}...")
                     except Exception as e:
                         print(f"🔍 OCR 오류 (문제 {problem_id}): {str(e)}")
                         ocr_results[problem_id] = ""
@@ -307,8 +309,53 @@ def grade_problems_mixed_task(self, worksheet_id: int, multiple_choice_answers: 
             meta={'current': 95, 'total': 100, 'status': '결과 저장 중...'}
         )
         
+        # 데이터베이스에 채점 결과 저장
+        from .models.grading_result import GradingSession, ProblemGradingResult
+        
+        grading_session = GradingSession(
+            worksheet_id=worksheet_id,
+            celery_task_id=task_id,
+            total_problems=total_count,
+            correct_count=correct_count,
+            total_score=total_score,
+            max_possible_score=total_count * points_per_problem,
+            points_per_problem=points_per_problem,
+            ocr_results=ocr_results,
+            multiple_choice_answers=multiple_choice_answers,
+            input_method="canvas",
+            graded_by=user_id
+        )
+        
+        db.add(grading_session)
+        db.flush()
+        
+        # 문제별 채점 결과 저장
+        for result_item in grading_results:
+            problem_result = ProblemGradingResult(
+                grading_session_id=grading_session.id,
+                problem_id=result_item["problem_id"],
+                user_answer=result_item.get("user_answer", ""),
+                actual_user_answer=result_item.get("actual_user_answer", result_item.get("user_answer", "")),
+                correct_answer=result_item["correct_answer"],
+                is_correct=result_item["is_correct"],
+                score=result_item["score"],
+                points_per_problem=result_item["points_per_problem"],
+                problem_type=result_item["problem_type"],
+                input_method=result_item.get("input_method", "canvas"),
+                ai_score=result_item.get("ai_score"),
+                ai_feedback=result_item.get("ai_feedback"),
+                strengths=result_item.get("strengths"),
+                improvements=result_item.get("improvements"),
+                keyword_score_ratio=result_item.get("keyword_score_ratio"),
+                explanation=result_item.get("explanation", "")
+            )
+            db.add(problem_result)
+        
+        db.commit()
+        
         # 결과 반환
         result = {
+            "grading_session_id": grading_session.id,
             "worksheet_id": worksheet_id,
             "total_problems": total_count,
             "correct_count": correct_count,
@@ -365,9 +412,13 @@ def grade_problems_task(self, worksheet_id: int, image_data: bytes, user_id: int
         )
         
         # OCR로 학생 답안 추출
-        ocr_text = ai_service.ocr_handwriting(image_data)
-        if not ocr_text:
+        raw_ocr_text = ai_service.ocr_handwriting(image_data)
+        if not raw_ocr_text:
             raise ValueError("답안지에서 텍스트를 인식할 수 없습니다.")
+        
+        # OCR 텍스트 전처리 (분수 정규화)
+        ocr_text = _normalize_fraction_text(raw_ocr_text)
+        print(f"🔍 OCR 전처리: '{raw_ocr_text}' → '{ocr_text}'")
         
         # 진행률 업데이트
         self.update_state(
@@ -419,8 +470,52 @@ def grade_problems_task(self, worksheet_id: int, image_data: bytes, user_id: int
             meta={'current': 95, 'total': 100, 'status': '결과 저장 중...'}
         )
         
+        # 데이터베이스에 채점 결과 저장
+        from .models.grading_result import GradingSession, ProblemGradingResult
+        
+        grading_session = GradingSession(
+            worksheet_id=worksheet_id,
+            celery_task_id=task_id,
+            total_problems=total_count,
+            correct_count=correct_count,
+            total_score=final_total_score,
+            max_possible_score=total_count * points_per_problem,
+            points_per_problem=points_per_problem,
+            ocr_text=ocr_text,
+            input_method="image_upload",
+            graded_by=user_id
+        )
+        
+        db.add(grading_session)
+        db.flush()
+        
+        # 문제별 채점 결과 저장
+        for result_item in grading_results:
+            problem_result = ProblemGradingResult(
+                grading_session_id=grading_session.id,
+                problem_id=result_item["problem_id"],
+                user_answer=result_item.get("user_answer", ""),
+                actual_user_answer=result_item.get("actual_user_answer", result_item.get("user_answer", "")),
+                correct_answer=result_item["correct_answer"],
+                is_correct=result_item["is_correct"],
+                score=result_item["score"],
+                points_per_problem=result_item["points_per_problem"],
+                problem_type=result_item["problem_type"],
+                input_method="handwriting_ocr",
+                ai_score=result_item.get("ai_score"),
+                ai_feedback=result_item.get("ai_feedback"),
+                strengths=result_item.get("strengths"),
+                improvements=result_item.get("improvements"),
+                keyword_score_ratio=result_item.get("keyword_score_ratio"),
+                explanation=result_item.get("explanation", "")
+            )
+            db.add(problem_result)
+        
+        db.commit()
+        
         # 결과 반환
         result = {
+            "grading_session_id": grading_session.id,
             "worksheet_id": worksheet_id,
             "total_problems": total_count,
             "correct_count": correct_count,
@@ -444,6 +539,91 @@ def grade_problems_task(self, worksheet_id: int, image_data: bytes, user_id: int
     finally:
         db.close()
 
+
+def _normalize_fraction_text(text: str) -> str:
+    """OCR 텍스트에서 세로 분수 패턴을 찾아서 표준 형태로 변환"""
+    import re
+    from fractions import Fraction
+    
+    # 여러 줄로 나뉜 분수 패턴 찾기
+    lines = text.split('\n')
+    normalized_lines = []
+    
+    i = 0
+    while i < len(lines):
+        current_line = lines[i].strip()
+        
+        # 분수 패턴 찾기: 숫자 → 선(-, ―, —) → 숫자
+        if (i + 2 < len(lines) and 
+            re.match(r'^\s*\d+\s*$', current_line) and  # 첫 줄: 숫자만
+            re.match(r'^\s*[-―—_]+\s*$', lines[i + 1].strip()) and  # 둘째 줄: 선
+            re.match(r'^\s*\d+\s*$', lines[i + 2].strip())):  # 셋째 줄: 숫자만
+            
+            numerator = current_line
+            denominator = lines[i + 2].strip()
+            
+            # 표준 분수 형태로 변환
+            fraction_text = f"{numerator}/{denominator}"
+            
+            print(f"🔍 세로 분수 발견: {numerator} over {denominator} → {fraction_text}")
+            normalized_lines.append(fraction_text)
+            i += 3  # 3줄을 처리했으므로 건너뛰기
+            continue
+        
+        # 분수가 아닌 경우 그대로 추가
+        normalized_lines.append(current_line)
+        i += 1
+    
+    # 공백으로 분리된 숫자들을 분수로 변환하기 (예: "2 7" → "2/7")
+    result_text = ' '.join(normalized_lines)
+    
+    # 연속된 두 숫자 사이에 공백이 있는 경우 분수로 해석
+    # 단, 문맥상 분수일 가능성이 높은 경우만 (작은 숫자들)
+    def replace_space_fractions(match):
+        num1, num2 = match.groups()
+        # 두 숫자 모두 10 이하인 경우만 분수로 변환
+        if int(num1) <= 20 and int(num2) <= 20:
+            return f"{num1}/{num2}"
+        return match.group(0)  # 원래 텍스트 그대로
+    
+    result_text = re.sub(r'(\d+)\s+(\d+)(?!\d)', replace_space_fractions, result_text)
+    
+    return result_text
+
+def _normalize_answer_for_comparison(answer: str) -> str:
+    """답안을 비교용으로 정규화"""
+    import re
+    from fractions import Fraction
+    
+    answer = answer.strip().lower()
+    
+    # 분수 표현을 찾아서 기약분수로 변환
+    fraction_patterns = [
+        r'(\d+)/(\d+)',  # 2/7
+        r'(\d+)분의(\d+)',  # 7분의2
+        r'(\d+) *분의 *(\d+)',  # 7 분의 2
+    ]
+    
+    def normalize_fraction(match):
+        if '분의' in match.group(0):
+            # '분의' 패턴: 분모가 먼저 온다
+            denominator = int(match.group(1))
+            numerator = int(match.group(2))
+        else:
+            # 일반 분수: 분자가 먼저 온다
+            numerator = int(match.group(1))
+            denominator = int(match.group(2))
+        
+        try:
+            frac = Fraction(numerator, denominator)
+            return f"{frac.numerator}/{frac.denominator}"
+        except:
+            return match.group(0)
+    
+    for pattern in fraction_patterns:
+        answer = re.sub(pattern, normalize_fraction, answer)
+    
+    return answer
 
 def _extract_answer_from_ocr(ocr_text: str, problem_id: int, problem_number: int) -> str:
     """OCR 텍스트에서 특정 문제의 답안을 추출"""
@@ -524,9 +704,12 @@ def _grade_objective_problem(problem: Problem, user_answer: str, points_per_prob
             except (json.JSONDecodeError, IndexError):
                 pass  # 변환 실패시 원래 답안 그대로 사용
     
-    # 답안 정규화 및 비교 (수학 답안에 맞게 개선)
-    correct_normalized = problem.correct_answer.strip().lower()
-    user_normalized = actual_user_answer.strip().lower()
+    # 답안 정규화 및 비교 (분수 처리 포함)
+    correct_normalized = _normalize_answer_for_comparison(problem.correct_answer)
+    user_normalized = _normalize_answer_for_comparison(actual_user_answer)
+    
+    print(f"🔍 답안 비교: 정답 '{problem.correct_answer}' → '{correct_normalized}'")
+    print(f"🔍 답안 비교: 학생 '{actual_user_answer}' → '{user_normalized}'")
     
     # 기본 문자열 매칭
     is_correct = correct_normalized == user_normalized
